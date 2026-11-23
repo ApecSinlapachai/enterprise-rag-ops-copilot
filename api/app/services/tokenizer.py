@@ -296,7 +296,7 @@ def detect_language(text: str) -> QueryLanguageType:
         return "en"
 
     minority = min(thai_count, latin_count)
-    if minority / total >= 0.15 or minority >= 3:
+    if minority / total >= 0.15:
         return "mixed"
     return "th" if thai_count >= latin_count else "en"
 

@@ -25,6 +25,9 @@
      - *Stage 0 (Injection Gate):* Regex/heuristic block (`ignore previous instructions`, `reveal system prompt`, `ลืมคำสั่งทั้งหมด`) → `BLOCKED_INJECTION` (`$0` LLM spend).
      - *Stage 1 (Pre-LLM Retrieval Gate):* If `chunks_found == 0` OR (`max_vec_similarity < 0.58` AND `max_fts_rank < 0.08`) → deterministic `REFUSED_LOW_EVIDENCE` (`$0` LLM spend).
      - *Stage 2 (Post-LLM Groundedness Gate):* Validate `cited_chunk_ids` against retrieved chunk UUIDs; if `not is_answerable` OR `confidence_score < 0.55` OR `len(valid_cited_chunk_ids) == 0` → override with deterministic refusal and clear `citations = []`.
+5. **Mandatory Context & Progress Sync (`AGENTS.md` Update Policy):**
+   - Whenever a milestone (`Day X`) is completed and all lint (`ruff`) and test (`pytest`) checks pass, you MUST update `AGENTS.md` (Section 2 Repository Structure, Section 3 Execution Roadmap, and verified test/lint counts) before wrapping up so that full project context is preserved for future sessions.
+   - When updating `README.md` or writing Git commit messages for GitHub pushes, describe the completed features and verified test counts directly without including `Day X` labels.
 
 ---
 
@@ -37,27 +40,27 @@ enterprise-rag-ops-copilot/
 ├── sql/
 │   ├── 001_schema.sql                  # [DONE] Validated PG16 + pgvector + pg_trgm DDL
 │   └── 002_hybrid_search_query.sql     # [DONE] Reference RRF hybrid search CTE
-├── data/mock_docs/                     # [TODO Day 3] 10-12 Thai/EN/bilingual B2B SaaS Ops docs
+├── data/mock_docs/                     # [DONE Day 3] 12 Thai/EN/bilingual B2B SaaS Ops docs (52 chunks)
 ├── api/
 │   ├── Dockerfile                      # [DONE] Multi-stage python:3.12-slim
 │   ├── pyproject.toml                  # [DONE] Dependencies, ruff, pytest config
 │   └── app/
 │       ├── config.py                   # [DONE] Pydantic BaseSettings & thresholds
 │       ├── db.py                       # [DONE] psycopg3 ConnectionPool & check_health()
-│       ├── main.py                     # [DONE] FastAPI lifespan, CORS, GET /health
+│       ├── main.py                     # [DONE] FastAPI lifespan, CORS, GET /health, RAG router
 │       ├── schemas/{rag,triage,eval}.py# [DONE] Pydantic v2 contracts
-│       ├── services/                   # [TODO Day 3-7] tokenizer, embeddings, retriever, guardrails, generator, triage_service, rate_limiter
-│       └── routers/                    # [TODO Day 5-7] rag, triage, documents, eval
+│       ├── services/                   # [DONE Day 3-5: tokenizer, embeddings, guardrails, retriever, generator] + [TODO Day 6-9: triage_service, rate_limiter]
+│       └── routers/                    # [DONE Day 5: rag] + [TODO Day 6-7: triage, documents, eval]
 ├── scripts/
-│   ├── ingest_corpus.py                # [TODO Day 4] Chunk, tokenize, embed, upsert mock_docs/
+│   ├── ingest_corpus.py                # [DONE Day 4] Chunk, tokenize, embed, upsert mock_docs/
 │   └── record_demo_gif.ps1             # [TODO Day 12] Playwright/FFmpeg capture script
 ├── eval/
 │   ├── golden_eval_set.json            # [TODO Day 7] 25 cases (6 TH, 5 EN, 4 Mixed, 4 Unanswerable, 3 Injection, 3 Triage)
 │   ├── run_eval.py                     # [TODO Day 7] Eval runner (ci_mock & live_gemini)
 │   └── thresholds.json                 # [TODO Day 7] CI pass/fail thresholds
 ├── tests/
-│   ├── unit/                           # [DONE Day 1-2: 9 tests] + [TODO Day 3-7: tokenizer, guardrails, rrf]
-│   ├── integration/                    # [DONE Day 2: 2 live PG16 pgvector + RRF tests]
+│   ├── unit/                           # [DONE Day 1-5: 21 tests] + [TODO Day 6-7: triage, eval]
+│   ├── integration/                    # [DONE Day 2-5: 3 live PG16 pgvector + RRF + RAG pipeline tests]
 │   └── eval/                           # [TODO Day 8] test_golden_eval_gate.py
 ├── web/                                # [TODO Day 9-11] Next.js App Router (Vercel No-Login Live Demo)
 ├── docker-compose.yml                  # [DONE] pgvector/pgvector:pg16 + api
@@ -73,11 +76,13 @@ enterprise-rag-ops-copilot/
 - **Day 2 (Completed):**
   1. Hardened architecture via Devil's Advocate review: exact `vec_similarity` recomputation for FTS-only RRF winners, `$3` `pg_trgm` (`~*`) SKU/error code boost without `%` placeholder collisions in `psycopg3`, calibrated `min_vec_similarity=0.58` / `min_fts_rank=0.08`, added `format_citation_snippet()`, and pre-warmed `PyThaiNLP (newmm)` during FastAPI lifespan.
   2. Verified live `pgvector/pgvector:pg16` container (`rag_ops_postgres`), confirmed all 6 tables + `vector` & `pg_trgm` extensions + `002_hybrid_search_query.sql` RRF execution + live `GET /health` (`status: "ok", database_connected: true`), with 11/11 pytest tests (9 unit + 2 live DB integration) passing.
-- **Day 3 (Next Immediate Step):**
-  1. Author `10–12` realistic Thai/English/Bilingual B2B SaaS Operations knowledge documents in `data/mock_docs/` (SOPs, SLAs, refund policy, error code runbooks, security/PDPA FAQ, pricing tiers) using synthetic IDs (`INV-2026-0091`, `ERR-503`, `ORG-DEMO-01`).
-  2. Build `api/app/services/tokenizer.py` (`PyThaiNLP newmm` word segmentation, Thai/English + B2B SaaS domain stopword filtering, `OR`-joined `tsquery` builder, regex SKU/error code extractor for `$3`, and Markdown heading-aware section chunker) + unit tests in `tests/unit/test_tokenizer.py`.
-- **Day 4–5:** Build `embeddings.py` (with explicit 1536-dim L2 normalization + `task_type`), `scripts/ingest_corpus.py`, `retriever.py`, `guardrails.py`, `generator.py`, and `POST /api/v1/rag/query`.
-- **Day 6–8:** Build `triage_service.py` + `POST /api/v1/triage` (`tenacity` retry + deterministic fallback), `GET /api/v1/documents`, `POST /api/v1/ingest`, `GET /api/v1/eval/latest`, 25-case `eval/golden_eval_set.json`, `eval/run_eval.py`, `pgvector` integration tests, and `.github/workflows/ci.yml`.
+- **Day 3 (Completed):**
+  1. Authored `12` Thai/English/Bilingual B2B SaaS Operations knowledge documents in `data/mock_docs/` (4 TH, 4 EN, 4 Bilingual across all 6 `doc_type` values) with synthetic IDs (`INV-2026-0091`, `ERR-503`, `ERR-AUTH-403`, `ORG-DEMO-01`, `SKU-ENT-ANNUAL`).
+  2. Built `api/app/services/tokenizer.py` (`PyThaiNLP newmm` word segmentation, Thai/English + B2B SaaS domain stopword filtering, `OR`-joined `tsquery` builder, regex SKU/error code extractor for `$3`, language detector, and Markdown heading-aware section chunker) + 7 unit tests in `tests/unit/test_tokenizer.py`.
+- **Day 4–5 (Completed):**
+  1. Built `api/app/services/embeddings.py` (1536-dim L2 normalization, zero-norm guard, `task_type="RETRIEVAL_DOCUMENT"` / `"RETRIEVAL_QUERY"`, deterministic offline/429 fallback), `guardrails.py` (3-stage Injection / Pre-LLM Retrieval / Post-LLM UUID Citation gates), `retriever.py` (`002_hybrid_search_query.sql` RRF + `query_logs` telemetry), `generator.py` (`RAGAnswerLLMOutput` structured output + grounded extractive fallback), `scripts/ingest_corpus.py`, and synchronous `POST /api/v1/rag/query` (`api/app/routers/rag.py`).
+  2. Ingested all `12` mock documents (`52` chunks) into live `rag_ops_postgres`; verified with `ruff check app ../tests ../scripts` (clean) and `pytest -v` (24/24 tests passing: 21 unit + 3 live PG16 integration tests).
+- **Day 6–8 (Next Immediate Step):** Build `triage_service.py` + `POST /api/v1/triage` (`tenacity` retry + deterministic fallback), `GET /api/v1/documents`, `POST /api/v1/ingest`, `GET /api/v1/eval/latest`, 25-case `eval/golden_eval_set.json`, `eval/run_eval.py`, `eval/thresholds.json`, `tests/eval/test_golden_eval_gate.py`, and `.github/workflows/ci.yml`.
 - **Day 9–12:** Build `web/` (Next.js App Router: TH/EN toggle, `"Try Unanswerable Query"` button, Citation Drawer, Telemetry Strip, Ticket Triage tab, Eval Scorecard tab), `rate_limiter.py`, deploy Supabase + Render + Vercel, record `docs/assets/demo-60s.gif`, and finalize recruiter-ready `README.md`.
 - **Day 13–14 (Buffer):** Bug-bash, mobile polish, edge-case testing, pin repo on `github.com/ApecSinlapachai`, and export anonymized learnings back to AI OS (`client-project-bridge` / `ai-automation-til`).
 

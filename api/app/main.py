@@ -11,6 +11,10 @@ from pythainlp.tokenize import word_tokenize
 
 from app.config import Settings, get_settings
 from app.db import DatabaseManager
+from app.routers import rag_router
+from app.services.embeddings import EmbeddingService
+from app.services.generator import RAGGenerator
+from app.services.retriever import HybridRetriever
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +39,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     """Create and configure the FastAPI application."""
     cfg = settings or get_settings()
     db_manager = DatabaseManager(cfg.database_url)
+    embedder = EmbeddingService(cfg)
+    retriever = HybridRetriever(db=db_manager, embedder=embedder, settings=cfg)
+    generator = RAGGenerator(cfg)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.settings = cfg
         app.state.db = db_manager
+        app.state.embedder = embedder
+        app.state.retriever = retriever
+        app.state.generator = generator
         _prewarm_thai_tokenizer()
         db_manager.open()
         try:
@@ -52,6 +62,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version=cfg.app_version,
         lifespan=lifespan,
     )
+    app.state.settings = cfg
+    app.state.db = db_manager
+    app.state.embedder = embedder
+    app.state.retriever = retriever
+    app.state.generator = generator
 
     app.add_middleware(
         CORSMiddleware,
@@ -69,6 +84,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             version=cfg.app_version,
             database_connected=db_ok,
         )
+
+    app.include_router(rag_router)
 
     return app
 
