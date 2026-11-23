@@ -217,15 +217,12 @@ def run_golden_evaluation(
     """Run the 25-case Golden Evaluation Gate and persist telemetry to PostgreSQL."""
     base_cfg = settings or get_settings()
     force_mock = mode == "ci_mock"
-    cfg = (
-        Settings(
-            database_url=base_cfg.database_url,
-            gemini_api_key="test-offline-ci-key",
-            admin_ingest_token=base_cfg.admin_ingest_token,
-            cors_origins=base_cfg.cors_origins,
-        )
-        if force_mock
-        else base_cfg
+    cfg = base_cfg.model_copy(
+        update={
+            "rate_limit_per_min": max(base_cfg.rate_limit_per_min, 1000),
+            "rate_limit_per_day": max(base_cfg.rate_limit_per_day, 1000),
+            **({"gemini_api_key": "test-offline-ci-key"} if force_mock else {}),
+        }
     )
 
     dataset: list[dict[str, Any]] = json.loads(dataset_path.read_text(encoding="utf-8"))

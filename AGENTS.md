@@ -36,7 +36,7 @@
 ```text
 enterprise-rag-ops-copilot/
 ├── .github/workflows/ci.yml            # [DONE Day 8] Ruff, Pytest, PG16 DDL, 25-Case Eval Gate, Docker, Next.js build
-├── docs/assets/demo-60s.gif            # [TODO Day 12] 1280x720, 15fps, <= 8MB walkthrough GIF
+├── docs/assets/demo-60s.gif            # [DONE Day 12] 1280x720, 15fps, 0.98 MB walkthrough GIF
 ├── sql/
 │   ├── 001_schema.sql                  # [DONE] Validated PG16 + pgvector + pg_trgm DDL
 │   └── 002_hybrid_search_query.sql     # [DONE] Reference RRF hybrid search CTE
@@ -49,23 +49,25 @@ enterprise-rag-ops-copilot/
 │       ├── db.py                       # [DONE] psycopg3 ConnectionPool & check_health()
 │       ├── main.py                     # [DONE] FastAPI lifespan, CORS, GET /health, all v1 routers
 │       ├── schemas/{rag,triage,eval}.py# [DONE] Pydantic v2 contracts
-│       ├── services/                   # [DONE Day 3-7: tokenizer, embeddings, guardrails, retriever, generator, triage_service] + [TODO Day 9: rate_limiter]
+│       ├── services/                   # [DONE Day 3-9: tokenizer, embeddings, guardrails, retriever, generator, triage_service, rate_limiter]
 │       └── routers/                    # [DONE Day 5-7: rag, triage, documents, eval]
 ├── scripts/
 │   ├── ingest_corpus.py                # [DONE Day 4] Chunk, tokenize, embed, upsert mock_docs/
-│   └── record_demo_gif.ps1             # [TODO Day 12] Playwright/FFmpeg capture script
+│   ├── generate_demo_gif.py            # [DONE Day 12] Live-output 1280x720 demo-60s.gif generator
+│   └── record_demo_gif.ps1             # [DONE Day 10] FFmpeg 2-pass palette GIF converter
 ├── eval/
 │   ├── golden_eval_set.json            # [DONE Day 7] 25 cases (6 TH, 5 EN, 4 Mixed, 4 Unanswerable, 3 Injection, 3 Triage)
 │   ├── run_eval.py                     # [DONE Day 7] Eval runner (ci_mock, hybrid_replay & live_gemini)
 │   └── thresholds.json                 # [DONE Day 7] CI pass/fail thresholds
 ├── tests/
-│   ├── unit/                           # [DONE Day 1-7: 26 tests]
+│   ├── unit/                           # [DONE Day 1-12: 31 tests]
 │   ├── integration/                    # [DONE Day 2-5: 3 live PG16 pgvector + RRF + RAG pipeline tests]
 │   └── eval/                           # [DONE Day 8: 2 Golden Eval Gate tests]
-├── web/                                # [TODO Day 9-11] Next.js App Router (Vercel No-Login Live Demo)
+├── web/                                # [DONE Day 9-12] Next.js 15 App Router + Tailwind CSS (No-Login Live Demo)
+├── render.yaml                         # [DONE Day 11] Render Free Web Service Blueprint
 ├── docker-compose.yml                  # [DONE] pgvector/pgvector:pg16 + api
 ├── .env.example                        # [DONE] Safe placeholders
-└── README.md                           # [DONE Day 1 starter] -> [Update Day 12 with GIF, Live URL, Mermaid, Eval Table]
+└── README.md                           # [DONE Day 12] Walkthrough GIF, Mermaid diagram, Eval Table, Deploy Guide
 ```
 
 ---
@@ -86,7 +88,16 @@ enterprise-rag-ops-copilot/
   1. Built `api/app/services/triage_service.py` (structured Gemini extraction with `tenacity` retry, deterministic entity extraction + bilingual rule fallback, and `triage_tickets` DB persistence), `api/app/routers/triage.py` (`POST /api/v1/triage`), `api/app/routers/documents.py` (`GET /api/v1/documents`, `POST /api/v1/ingest` with `hmac.compare_digest` `X-Admin-Token` guard), and `api/app/routers/eval.py` (`GET /api/v1/eval/latest`), wired as synchronous `def` handlers into `api/app/main.py`.
   2. Built 25-case `eval/golden_eval_set.json` (6 TH, 5 EN, 4 Mixed, 4 Out-of-Scope, 3 Injection, 3 Triage), `eval/thresholds.json`, `eval/run_eval.py` (`ci_mock`, `hybrid_replay`, `live_gemini`), `tests/unit/test_triage_service.py`, `tests/eval/test_golden_eval_gate.py`, and `.github/workflows/ci.yml`.
   3. Verified `ruff check app ../tests ../scripts ../eval` (0 errors), `pytest -v` (**31/31** tests passing: 26 unit + 3 live PG16 integration + 2 Golden Eval Gate tests), `docker compose config -q` (clean), and `eval/run_eval.py --mode ci_mock` (**25/25** passed, Citation Hit Rate `1.0000`, Refusal Precision `1.0000`, Injection Block Rate `1.0000`, JSON Schema Pass Rate `1.0000`, Avg/P95 Latency `36 ms / 48 ms`).
-- **Day 9–12 (Next Immediate Step):** Build `web/` (Next.js App Router: TH/EN toggle, `"Try Unanswerable Query"` button, Citation Drawer, Telemetry Strip, Ticket Triage tab, Eval Scorecard tab), `rate_limiter.py`, deploy Supabase + Render + Vercel, record `docs/assets/demo-60s.gif`, and finalize recruiter-ready `README.md`.
+- **Day 9–10 (Completed):**
+  1. Built `api/app/services/rate_limiter.py` (thread-safe, SHA-256 IP-hashed sliding-window rate limiter enforcing `15 req/min` & `60 req/day`, reading first hop of `X-Forwarded-For` with `Retry-After` HTTP `429` header) + wired into `POST /api/v1/rag/query` and `POST /api/v1/triage` + added 3 unit tests in `tests/unit/test_rate_limiter.py`.
+  2. Scaffolded and built `web/` (Next.js 15 App Router + TypeScript + Tailwind CSS): `/health` cold-start warm-up ping, TH/EN UI toggle, Hybrid RAG workspace (sample chips, `"Try Unanswerable Query"`, `"Try Prompt Injection"`, Telemetry Strip, Citation Drawer with `vec_similarity`/`fts_rank`/`rrf_score`), Ticket Triage workspace, and Golden Eval Scorecard + Active Corpus tab.
+  3. Added `scripts/record_demo_gif.ps1` (2-pass FFmpeg palette GIF converter) and updated `README.md`.
+  4. Verified `ruff check app ../tests ../scripts ../eval` (0 errors), `pytest -v` (**34/34** tests passing: 29 unit + 3 live PG16 integration + 2 Golden Eval Gate tests), and `web/` `npx tsc --noEmit && npm run build` (clean).
+- **Day 11–12 (Local Artifacts & Audit Completed; Cloud Deployment Pending User Accounts):**
+  1. Exposed `Retry-After` via `CORSMiddleware(expose_headers=["Retry-After"])` in `api/app/main.py` and bounded `SlidingWindowRateLimiter` key growth (`max_tracked_keys=10_000` + stale-key eviction) with 2 additional unit tests in `tests/unit/test_rate_limiter.py`.
+  2. Made `api/Dockerfile` `$PORT`-aware with pre-warmed PyThaiNLP, added `/app/data/mock_docs` and `/app/sql` mounts to `docker-compose.yml`, updated `retriever.py` SQL path resolution, and added `render.yaml` Blueprint.
+  3. Polished TH/EN localization in `web/`, generated `docs/assets/demo-60s.gif` (`1280x720`, `15fps`, `0.98 MB`) via `scripts/generate_demo_gif.py`, and updated `README.md` with the walkthrough GIF, Mermaid architecture diagram, API reference, and Free-Tier Deployment Guide.
+  4. Verified `ruff check app ../tests ../scripts ../eval` (0 errors), `pytest -v` (**36/36** tests passing: 31 unit + 3 live PG16 integration + 2 Golden Eval Gate tests), `docker compose config -q` (clean), and `web/` `npx tsc --noEmit && npm run build` (clean). Cloud provisioning (Supabase + Render + Vercel) remains for adding the live URL.
 - **Day 13–14 (Buffer):** Bug-bash, mobile polish, edge-case testing, pin repo on `github.com/ApecSinlapachai`, and export anonymized learnings back to AI OS (`client-project-bridge` / `ai-automation-til`).
 
 ---

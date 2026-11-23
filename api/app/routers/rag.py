@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import time
 from uuid import uuid4
 
@@ -17,28 +16,18 @@ from app.services.guardrails import (
     check_pre_llm_retrieval_gate,
     check_prompt_injection,
 )
+from app.services.rate_limiter import enforce_rate_limit
 from app.services.retriever import HybridRetriever, record_query_log
 from app.services.tokenizer import detect_language
 
 router = APIRouter(prefix="/api/v1/rag", tags=["rag"])
 
 
-def hash_client_ip(request: Request) -> str:
-    """Hash first-hop X-Forwarded-For or client host with SHA-256 for privacy."""
-    forwarded = request.headers.get("x-forwarded-for", "").strip()
-    if forwarded:
-        client_ip = forwarded.split(",", 1)[0].strip()
-    elif request.client and request.client.host:
-        client_ip = request.client.host
-    else:
-        client_ip = "127.0.0.1"
-    return hashlib.sha256(client_ip.encode("utf-8")).hexdigest()
-
-
 @router.post("/query", response_model=RAGQueryResponse)
 def query_rag(payload: RAGQueryRequest, request: Request) -> RAGQueryResponse:
     """Execute 3-stage guarded Thai-English Hybrid RAG query (sync threadpool)."""
     start_ns = time.perf_counter_ns()
+    ip_hash = enforce_rate_limit(request)
     request_id = f"rag-{uuid4().hex[:12]}"
     settings: Settings = request.app.state.settings
     db: DatabaseManager = request.app.state.db
@@ -50,7 +39,6 @@ def query_rag(payload: RAGQueryRequest, request: Request) -> RAGQueryResponse:
         if payload.language_hint == "auto"
         else payload.language_hint
     )
-    ip_hash = hash_client_ip(request)
 
     # Stage 0: Prompt Injection Gate ($0 LLM spend).
     injection_decision = check_prompt_injection(payload.query, query_language=query_language)

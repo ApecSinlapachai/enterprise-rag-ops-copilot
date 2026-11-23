@@ -35,6 +35,9 @@ services:
       GEMINI_EMBED_DIM: ${GEMINI_EMBED_DIM:-1536}
       ADMIN_INGEST_TOKEN: ${ADMIN_INGEST_TOKEN:-change-me-local-admin-token}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+    volumes:
+      - ./data/mock_docs:/app/data/mock_docs:ro
+      - ./sql:/app/sql:ro
     ports:
       - "8000:8000"
 

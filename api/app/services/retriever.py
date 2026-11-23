@@ -27,6 +27,11 @@ logger = logging.getLogger(__name__)
 _DEFAULT_HYBRID_SQL_PATH = (
     pathlib.Path(__file__).resolve().parents[3] / "sql" / "002_hybrid_search_query.sql"
 )
+_SQL_PATH_CANDIDATES: tuple[pathlib.Path, ...] = (
+    _DEFAULT_HYBRID_SQL_PATH,
+    pathlib.Path.cwd() / "sql" / "002_hybrid_search_query.sql",
+    pathlib.Path("/app/sql/002_hybrid_search_query.sql"),
+)
 
 _FALLBACK_HYBRID_SQL = """
 WITH vec_search AS (
@@ -132,15 +137,17 @@ LIMIT 5;
 """
 
 
-def _load_hybrid_sql(sql_path: pathlib.Path = _DEFAULT_HYBRID_SQL_PATH) -> str:
+def _load_hybrid_sql(sql_path: pathlib.Path | None = None) -> str:
     """Load sql/002_hybrid_search_query.sql and convert $1/$2/$3 to psycopg3 named params."""
-    if sql_path.exists():
-        raw_sql = sql_path.read_text(encoding="utf-8")
-        return (
-            raw_sql.replace("$1", "%(vec)s")
-            .replace("$2", "%(tsq)s")
-            .replace("$3", "%(code)s")
-        )
+    candidates = (sql_path,) if sql_path is not None else _SQL_PATH_CANDIDATES
+    for candidate in candidates:
+        if candidate.is_file():
+            raw_sql = candidate.read_text(encoding="utf-8")
+            return (
+                raw_sql.replace("$1", "%(vec)s")
+                .replace("$2", "%(tsq)s")
+                .replace("$3", "%(code)s")
+            )
     return _FALLBACK_HYBRID_SQL
 
 
@@ -183,7 +190,7 @@ class HybridRetriever:
         db: DatabaseManager,
         embedder: EmbeddingService,
         settings: Settings,
-        sql_path: pathlib.Path = _DEFAULT_HYBRID_SQL_PATH,
+        sql_path: pathlib.Path | None = None,
     ) -> None:
         self._db = db
         self._embedder = embedder

@@ -14,6 +14,7 @@ from app.db import DatabaseManager
 from app.routers import documents_router, eval_router, rag_router, triage_router
 from app.services.embeddings import EmbeddingService
 from app.services.generator import RAGGenerator
+from app.services.rate_limiter import SlidingWindowRateLimiter
 from app.services.retriever import HybridRetriever
 from app.services.triage_service import TicketTriageService
 
@@ -44,6 +45,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     retriever = HybridRetriever(db=db_manager, embedder=embedder, settings=cfg)
     generator = RAGGenerator(cfg)
     triage_service = TicketTriageService(settings=cfg, db=db_manager)
+    rate_limiter = SlidingWindowRateLimiter(
+        per_min=cfg.rate_limit_per_min,
+        per_day=cfg.rate_limit_per_day,
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -53,6 +58,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.retriever = retriever
         app.state.generator = generator
         app.state.triage_service = triage_service
+        app.state.rate_limiter = rate_limiter
         _prewarm_thai_tokenizer()
         db_manager.open()
         try:
@@ -71,6 +77,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.retriever = retriever
     app.state.generator = generator
     app.state.triage_service = triage_service
+    app.state.rate_limiter = rate_limiter
 
     app.add_middleware(
         CORSMiddleware,
@@ -78,6 +85,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_credentials=False,
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Content-Type", "X-Admin-Token"],
+        expose_headers=["Retry-After"],
     )
 
     @app.get("/health", response_model=HealthResponse, tags=["system"])
