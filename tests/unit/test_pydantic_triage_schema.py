@@ -100,7 +100,7 @@ def test_rag_and_triage_request_length_bounds() -> None:
         retrieval_ms=12,
         generation_ms=0,
         total_latency_ms=12,
-        model_name="gemini-2.5-flash",
+        model_name="gemini-3.8-flash",
     )
     assert valid_resp.estimated_cost_usd == 0.0
 

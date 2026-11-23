@@ -17,6 +17,7 @@ from app.config import Settings
 from app.db import DatabaseManager
 from app.schemas.triage import (
     TriageTicketExtraction,
+    TriageTicketLLMOutput,
     TriageTicketRequest,
     TriageTicketResponse,
 )
@@ -306,7 +307,7 @@ def _enforce_triage_invariants(
     raw_message: str,
 ) -> TriageTicketExtraction:
     """Merge deterministic entity extraction and enforce human-review safety policies."""
-    merged_entities = {**extract_ticket_entities(raw_message), **extraction.extracted_entities}
+    merged_entities = {**extraction.extracted_entities, **extract_ticket_entities(raw_message)}
     needs_review = extraction.requires_human_review or (
         extraction.priority in ("P0", "P1")
         or extraction.category in ("billing_refund", "prompt_injection_attempt")
@@ -417,16 +418,18 @@ class TicketTriageService:
             config=types.GenerateContentConfig(
                 system_instruction=_TRIAGE_SYSTEM_PROMPT,
                 response_mime_type="application/json",
-                response_schema=TriageTicketExtraction,
+                response_schema=TriageTicketLLMOutput,
                 temperature=0.1,
             ),
         )
         parsed = getattr(response, "parsed", None)
-        if isinstance(parsed, TriageTicketExtraction):
+        if isinstance(parsed, TriageTicketLLMOutput):
+            extraction = parsed.to_extraction()
+        elif isinstance(parsed, TriageTicketExtraction):
             extraction = parsed
         else:
             raw_text = getattr(response, "text", "") or ""
-            extraction = TriageTicketExtraction.model_validate_json(raw_text)
+            extraction = TriageTicketLLMOutput.model_validate_json(raw_text).to_extraction()
 
         usage = getattr(response, "usage_metadata", None)
         in_tok = int(getattr(usage, "prompt_token_count", 0) or 0)

@@ -17,7 +17,7 @@ from app.services.retriever import RetrievalChunk
 
 logger = logging.getLogger(__name__)
 
-# Approximate Gemini 2.5 Flash public pricing per 1M tokens for cost observability.
+# Approximate Gemini 3.8 Flash public pricing per 1M tokens for cost observability.
 _INPUT_USD_PER_M = 0.15
 _OUTPUT_USD_PER_M = 0.60
 

@@ -141,7 +141,7 @@ export default function HomePage() {
 
       <footer className="mx-auto max-w-6xl border-t border-slate-800/80 px-4 py-5 text-center text-xs text-slate-500 sm:px-6">
         Public No-Login Portfolio Demo • Synthetic B2B SaaS Operations Corpus (`INV-2026-0091`,
-        `ORG-DEMO-01`, `ERR-503`) • FastAPI + pgvector + PyThaiNLP + Gemini 2.5 Flash
+        `ORG-DEMO-01`, `ERR-503`) • FastAPI + pgvector + PyThaiNLP + Gemini 3.8 Flash
       </footer>
     </div>
   );

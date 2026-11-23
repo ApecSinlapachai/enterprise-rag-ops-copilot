@@ -23,7 +23,7 @@ class Settings(BaseSettings):
         default="postgresql://postgres:postgres@localhost:5432/rag_ops"
     )
     gemini_api_key: str = Field(default="your-gemini-api-key-here")
-    gemini_chat_model: str = Field(default="gemini-2.5-flash")
+    gemini_chat_model: str = Field(default="gemini-3.8-flash")
     gemini_embed_model: str = Field(default="gemini-embedding-001")
     gemini_embed_dim: int = Field(default=1536, ge=128, le=3072)
 

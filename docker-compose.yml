@@ -30,7 +30,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-rag_ops}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-your-gemini-api-key-here}
-      GEMINI_CHAT_MODEL: ${GEMINI_CHAT_MODEL:-gemini-2.5-flash}
+      GEMINI_CHAT_MODEL: ${GEMINI_CHAT_MODEL:-gemini-3.8-flash}
       GEMINI_EMBED_MODEL: ${GEMINI_EMBED_MODEL:-gemini-embedding-001}
       GEMINI_EMBED_DIM: ${GEMINI_EMBED_DIM:-1536}
       ADMIN_INGEST_TOKEN: ${ADMIN_INGEST_TOKEN:-change-me-local-admin-token}

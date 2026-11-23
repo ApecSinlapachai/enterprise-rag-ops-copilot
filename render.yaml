@@ -24,7 +24,7 @@ services:
       - key: CORS_ORIGINS
         value: https://enterprise-rag-ops-copilot.vercel.app,http://localhost:3000
       - key: GEMINI_CHAT_MODEL
-        value: gemini-2.5-flash
+        value: gemini-3.8-flash
       - key: GEMINI_EMBED_MODEL
         value: gemini-embedding-001
       - key: GEMINI_EMBED_DIM

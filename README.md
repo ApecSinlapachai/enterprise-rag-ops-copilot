@@ -29,7 +29,7 @@ flowchart LR
     S0 -->|"Clean"| RET["Hybrid RRF Retriever<br/>pgvector 1536d + PyThaiNLP FTS + pg_trgm"]
     RET --> S1{"Stage 1:<br/>Pre-LLM Gate<br/>(vec>=0.58 or fts>=0.08)"}
     S1 -->|"Refused ($0)"| LOG
-    S1 -->|"Evidence Found"| LLM["Gemini 2.5 Flash Structured Output<br/>(+ Grounded Extractive Fallback)"]
+    S1 -->|"Evidence Found"| LLM["Gemini 3.8 Flash Structured Output<br/>(+ Grounded Extractive Fallback)"]
     LLM --> S2{"Stage 2:<br/>UUID Citation & Confidence Gate"}
     S2 --> LOG
     RL -->|"POST /api/v1/triage"| TRI["TicketTriageService<br/>(Pydantic v2 + tenacity + fallback)"]

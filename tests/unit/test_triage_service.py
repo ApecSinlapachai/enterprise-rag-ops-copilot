@@ -9,7 +9,12 @@ from fastapi.testclient import TestClient
 
 from app.config import Settings
 from app.main import create_app
-from app.schemas.triage import TriageTicketExtraction, TriageTicketRequest
+from app.schemas.triage import (
+    TriageExtractedEntitiesLLM,
+    TriageTicketExtraction,
+    TriageTicketLLMOutput,
+    TriageTicketRequest,
+)
 from app.services.triage_service import (
     TicketTriageService,
     build_deterministic_triage,
@@ -194,3 +199,59 @@ def test_ingest_endpoint_enforces_constant_time_admin_token(monkeypatch) -> None
         assert body["status"] == "ingested"
         assert body["documents_processed"] == 12
         assert body["chunks_written"] == 52
+
+
+def _has_schema_key(node: object, key: str) -> bool:
+    if isinstance(node, dict):
+        return key in node or any(_has_schema_key(v, key) for v in node.values())
+    if isinstance(node, list):
+        return any(_has_schema_key(item, key) for item in node)
+    return False
+
+
+def test_triage_llm_schema_omits_additional_properties_and_converts() -> None:
+    assert not _has_schema_key(TriageTicketLLMOutput.model_json_schema(), "additionalProperties")
+
+    cfg = Settings(gemini_api_key="live-placeholder-for-mocked-client")
+    assert cfg.gemini_chat_model == "gemini-3.8-flash"
+    service = TicketTriageService(cfg, db=None, force_mock=False)
+
+    llm_output = TriageTicketLLMOutput(
+        language_detected="mixed",
+        category="billing_refund",
+        urgency_score=3,
+        priority="P2",
+        sentiment="negative",
+        summary="Customer requested SLA refund credit for invoice INV-2026-0091.",
+        suggested_action="Verify uptime SLA telemetry and route to billing_ops.",
+        suggested_team="billing_ops",
+        requires_human_review=False,
+        extracted_entities=TriageExtractedEntitiesLLM(
+            invoice_id="INV-2026-0091",
+            sku="SKU-ENT-ANNUAL",
+        ),
+    )
+    usage = SimpleNamespace(prompt_token_count=150, candidates_token_count=60)
+    ok_response = SimpleNamespace(parsed=llm_output, text="", usage_metadata=usage)
+
+    mock_models = MagicMock()
+    mock_models.generate_content.return_value = ok_response
+    service._client = SimpleNamespace(models=mock_models)  # type: ignore[assignment]
+
+    result = service.triage(
+        TriageTicketRequest(
+            message="ขอคืนเงินเครดิตสำหรับใบแจ้งหนี้ INV-2026-0091 ของ ORG-DEMO-01",
+            source_channel="web_demo",
+        )
+    )
+    call_kwargs = mock_models.generate_content.call_args.kwargs
+    assert call_kwargs["model"] == "gemini-3.8-flash"
+    assert call_kwargs["config"].response_schema is TriageTicketLLMOutput
+    assert result.validation_status == "pydantic_passed"
+    assert result.model_name == "gemini-3.8-flash"
+    assert result.requires_human_review is True
+    assert result.extracted_entities == {
+        "invoice_id": "INV-2026-0091",
+        "sku": "SKU-ENT-ANNUAL",
+        "org_id": "ORG-DEMO-01",
+    }
