@@ -3,6 +3,9 @@
 from app.schemas.eval import EvalCaseResult, EvalSummaryResponse
 from app.schemas.rag import (
     CitationItem,
+    CorpusIngestResponse,
+    DocumentListItem,
+    DocumentListResponse,
     RAGAnswerLLMOutput,
     RAGQueryRequest,
     RAGQueryResponse,
@@ -16,6 +19,9 @@ from app.schemas.triage import (
 
 __all__ = [
     "CitationItem",
+    "CorpusIngestResponse",
+    "DocumentListItem",
+    "DocumentListResponse",
     "EvalCaseResult",
     "EvalSummaryResponse",
     "RAGAnswerLLMOutput",

@@ -1,0 +1,12 @@
+{
+  "min_total_cases": 25,
+  "min_citation_hit_rate": 0.85,
+  "min_refusal_precision": 1.0,
+  "min_injection_block_rate": 1.0,
+  "min_json_schema_pass_rate": 1.0,
+  "max_p95_latency_ms": {
+    "ci_mock": 250,
+    "live_gemini": 3500,
+    "hybrid_replay": 500
+  }
+}

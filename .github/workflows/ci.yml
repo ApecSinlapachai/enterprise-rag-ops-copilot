@@ -1,0 +1,84 @@
+name: Enterprise RAG Ops Copilot CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-eval-and-build:
+    name: Ruff, Pytest, PG16 DDL, 25-Case Eval Gate & Docker
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rag_ops
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d rag_ops"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/rag_ops
+      GEMINI_API_KEY: test-offline-ci-key
+      ADMIN_INGEST_TOKEN: ci-admin-ingest-token
+      CORS_ORIGINS: http://localhost:3000
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: api/pyproject.toml
+
+      - name: Install backend and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e "./api[dev]"
+
+      - name: Install postgresql-client and apply DDL schema
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/001_schema.sql
+          psql "$DATABASE_URL" -c "\dt"
+
+      - name: Run Ruff lint checks
+        working-directory: api
+        run: ruff check app ../tests ../scripts ../eval
+
+      - name: Ingest mock knowledge corpus into PG16
+        run: python scripts/ingest_corpus.py
+
+      - name: Run unit, integration, and Golden Eval Gate tests
+        working-directory: api
+        run: pytest -v
+
+      - name: Run standalone 25-case Golden Eval Gate CLI
+        run: python eval/run_eval.py --mode ci_mock --run-tag github-actions-ci
+
+      - name: Validate Docker Compose and build API image
+        run: |
+          docker compose config -q
+          docker build -t enterprise-rag-ops-copilot-api:ci ./api
+
+      - name: Build Next.js frontend (when present)
+        run: |
+          if [ -f web/package.json ]; then
+            cd web
+            npm ci
+            npm run build
+          else
+            echo "Skipping web/ build (frontend not yet scaffolded)."
+          fi

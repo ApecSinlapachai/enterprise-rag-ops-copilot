@@ -35,7 +35,7 @@
 
 ```text
 enterprise-rag-ops-copilot/
-├── .github/workflows/ci.yml            # [TODO Day 8] Ruff, Pytest, PG16 DDL, Eval Gate, Docker, Next.js build
+├── .github/workflows/ci.yml            # [DONE Day 8] Ruff, Pytest, PG16 DDL, 25-Case Eval Gate, Docker, Next.js build
 ├── docs/assets/demo-60s.gif            # [TODO Day 12] 1280x720, 15fps, <= 8MB walkthrough GIF
 ├── sql/
 │   ├── 001_schema.sql                  # [DONE] Validated PG16 + pgvector + pg_trgm DDL
@@ -47,21 +47,21 @@ enterprise-rag-ops-copilot/
 │   └── app/
 │       ├── config.py                   # [DONE] Pydantic BaseSettings & thresholds
 │       ├── db.py                       # [DONE] psycopg3 ConnectionPool & check_health()
-│       ├── main.py                     # [DONE] FastAPI lifespan, CORS, GET /health, RAG router
+│       ├── main.py                     # [DONE] FastAPI lifespan, CORS, GET /health, all v1 routers
 │       ├── schemas/{rag,triage,eval}.py# [DONE] Pydantic v2 contracts
-│       ├── services/                   # [DONE Day 3-5: tokenizer, embeddings, guardrails, retriever, generator] + [TODO Day 6-9: triage_service, rate_limiter]
-│       └── routers/                    # [DONE Day 5: rag] + [TODO Day 6-7: triage, documents, eval]
+│       ├── services/                   # [DONE Day 3-7: tokenizer, embeddings, guardrails, retriever, generator, triage_service] + [TODO Day 9: rate_limiter]
+│       └── routers/                    # [DONE Day 5-7: rag, triage, documents, eval]
 ├── scripts/
 │   ├── ingest_corpus.py                # [DONE Day 4] Chunk, tokenize, embed, upsert mock_docs/
 │   └── record_demo_gif.ps1             # [TODO Day 12] Playwright/FFmpeg capture script
 ├── eval/
-│   ├── golden_eval_set.json            # [TODO Day 7] 25 cases (6 TH, 5 EN, 4 Mixed, 4 Unanswerable, 3 Injection, 3 Triage)
-│   ├── run_eval.py                     # [TODO Day 7] Eval runner (ci_mock & live_gemini)
-│   └── thresholds.json                 # [TODO Day 7] CI pass/fail thresholds
+│   ├── golden_eval_set.json            # [DONE Day 7] 25 cases (6 TH, 5 EN, 4 Mixed, 4 Unanswerable, 3 Injection, 3 Triage)
+│   ├── run_eval.py                     # [DONE Day 7] Eval runner (ci_mock, hybrid_replay & live_gemini)
+│   └── thresholds.json                 # [DONE Day 7] CI pass/fail thresholds
 ├── tests/
-│   ├── unit/                           # [DONE Day 1-5: 21 tests] + [TODO Day 6-7: triage, eval]
+│   ├── unit/                           # [DONE Day 1-7: 26 tests]
 │   ├── integration/                    # [DONE Day 2-5: 3 live PG16 pgvector + RRF + RAG pipeline tests]
-│   └── eval/                           # [TODO Day 8] test_golden_eval_gate.py
+│   └── eval/                           # [DONE Day 8: 2 Golden Eval Gate tests]
 ├── web/                                # [TODO Day 9-11] Next.js App Router (Vercel No-Login Live Demo)
 ├── docker-compose.yml                  # [DONE] pgvector/pgvector:pg16 + api
 ├── .env.example                        # [DONE] Safe placeholders
@@ -82,8 +82,11 @@ enterprise-rag-ops-copilot/
 - **Day 4–5 (Completed):**
   1. Built `api/app/services/embeddings.py` (1536-dim L2 normalization, zero-norm guard, `task_type="RETRIEVAL_DOCUMENT"` / `"RETRIEVAL_QUERY"`, deterministic offline/429 fallback), `guardrails.py` (3-stage Injection / Pre-LLM Retrieval / Post-LLM UUID Citation gates), `retriever.py` (`002_hybrid_search_query.sql` RRF + `query_logs` telemetry), `generator.py` (`RAGAnswerLLMOutput` structured output + grounded extractive fallback), `scripts/ingest_corpus.py`, and synchronous `POST /api/v1/rag/query` (`api/app/routers/rag.py`).
   2. Ingested all `12` mock documents (`52` chunks) into live `rag_ops_postgres`; verified with `ruff check app ../tests ../scripts` (clean) and `pytest -v` (24/24 tests passing: 21 unit + 3 live PG16 integration tests).
-- **Day 6–8 (Next Immediate Step):** Build `triage_service.py` + `POST /api/v1/triage` (`tenacity` retry + deterministic fallback), `GET /api/v1/documents`, `POST /api/v1/ingest`, `GET /api/v1/eval/latest`, 25-case `eval/golden_eval_set.json`, `eval/run_eval.py`, `eval/thresholds.json`, `tests/eval/test_golden_eval_gate.py`, and `.github/workflows/ci.yml`.
-- **Day 9–12:** Build `web/` (Next.js App Router: TH/EN toggle, `"Try Unanswerable Query"` button, Citation Drawer, Telemetry Strip, Ticket Triage tab, Eval Scorecard tab), `rate_limiter.py`, deploy Supabase + Render + Vercel, record `docs/assets/demo-60s.gif`, and finalize recruiter-ready `README.md`.
+- **Day 6–8 (Completed):**
+  1. Built `api/app/services/triage_service.py` (structured Gemini extraction with `tenacity` retry, deterministic entity extraction + bilingual rule fallback, and `triage_tickets` DB persistence), `api/app/routers/triage.py` (`POST /api/v1/triage`), `api/app/routers/documents.py` (`GET /api/v1/documents`, `POST /api/v1/ingest` with `hmac.compare_digest` `X-Admin-Token` guard), and `api/app/routers/eval.py` (`GET /api/v1/eval/latest`), wired as synchronous `def` handlers into `api/app/main.py`.
+  2. Built 25-case `eval/golden_eval_set.json` (6 TH, 5 EN, 4 Mixed, 4 Out-of-Scope, 3 Injection, 3 Triage), `eval/thresholds.json`, `eval/run_eval.py` (`ci_mock`, `hybrid_replay`, `live_gemini`), `tests/unit/test_triage_service.py`, `tests/eval/test_golden_eval_gate.py`, and `.github/workflows/ci.yml`.
+  3. Verified `ruff check app ../tests ../scripts ../eval` (0 errors), `pytest -v` (**31/31** tests passing: 26 unit + 3 live PG16 integration + 2 Golden Eval Gate tests), `docker compose config -q` (clean), and `eval/run_eval.py --mode ci_mock` (**25/25** passed, Citation Hit Rate `1.0000`, Refusal Precision `1.0000`, Injection Block Rate `1.0000`, JSON Schema Pass Rate `1.0000`, Avg/P95 Latency `36 ms / 48 ms`).
+- **Day 9–12 (Next Immediate Step):** Build `web/` (Next.js App Router: TH/EN toggle, `"Try Unanswerable Query"` button, Citation Drawer, Telemetry Strip, Ticket Triage tab, Eval Scorecard tab), `rate_limiter.py`, deploy Supabase + Render + Vercel, record `docs/assets/demo-60s.gif`, and finalize recruiter-ready `README.md`.
 - **Day 13–14 (Buffer):** Bug-bash, mobile polish, edge-case testing, pin repo on `github.com/ApecSinlapachai`, and export anonymized learnings back to AI OS (`client-project-bridge` / `ai-automation-til`).
 
 ---

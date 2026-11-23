@@ -1,5 +1,6 @@
-"""Pydantic v2 schemas for Hybrid RAG queries and grounded citations."""
+"""Pydantic v2 schemas for Hybrid RAG queries, grounded citations, and document inventory."""
 
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
@@ -72,3 +73,34 @@ class RAGQueryResponse(BaseModel):
     input_tokens: int = Field(0, ge=0)
     output_tokens: int = Field(0, ge=0)
     estimated_cost_usd: float = Field(0.0, ge=0.0, allow_inf_nan=False)
+
+
+class DocumentListItem(BaseModel):
+    """Active knowledge document summary returned by GET /api/v1/documents."""
+
+    document_id: UUID
+    source_key: str
+    title: str
+    language: Literal["th", "en", "bilingual"]
+    doc_type: Literal["sop", "sla", "faq", "security_policy", "runbook", "pricing"]
+    version: str
+    is_active: bool
+    chunk_count: int = Field(..., ge=0)
+    updated_at: datetime
+
+
+class DocumentListResponse(BaseModel):
+    """Knowledge base document inventory summary."""
+
+    total_documents: int = Field(..., ge=0)
+    total_chunks: int = Field(..., ge=0)
+    documents: list[DocumentListItem] = Field(default_factory=list)
+
+
+class CorpusIngestResponse(BaseModel):
+    """Admin corpus ingestion result returned by POST /api/v1/ingest."""
+
+    status: Literal["ingested"] = "ingested"
+    documents_processed: int = Field(..., ge=0)
+    chunks_written: int = Field(..., ge=0)
+    source_keys: list[str] = Field(default_factory=list)

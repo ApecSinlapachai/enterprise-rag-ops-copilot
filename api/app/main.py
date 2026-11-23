@@ -11,10 +11,11 @@ from pythainlp.tokenize import word_tokenize
 
 from app.config import Settings, get_settings
 from app.db import DatabaseManager
-from app.routers import rag_router
+from app.routers import documents_router, eval_router, rag_router, triage_router
 from app.services.embeddings import EmbeddingService
 from app.services.generator import RAGGenerator
 from app.services.retriever import HybridRetriever
+from app.services.triage_service import TicketTriageService
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     embedder = EmbeddingService(cfg)
     retriever = HybridRetriever(db=db_manager, embedder=embedder, settings=cfg)
     generator = RAGGenerator(cfg)
+    triage_service = TicketTriageService(settings=cfg, db=db_manager)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -50,6 +52,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.embedder = embedder
         app.state.retriever = retriever
         app.state.generator = generator
+        app.state.triage_service = triage_service
         _prewarm_thai_tokenizer()
         db_manager.open()
         try:
@@ -67,6 +70,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.embedder = embedder
     app.state.retriever = retriever
     app.state.generator = generator
+    app.state.triage_service = triage_service
 
     app.add_middleware(
         CORSMiddleware,
@@ -86,6 +90,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     app.include_router(rag_router)
+    app.include_router(triage_router)
+    app.include_router(documents_router)
+    app.include_router(eval_router)
 
     return app
 
