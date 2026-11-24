@@ -2,10 +2,22 @@
 
 > **Production-Minded Thai–English Hybrid RAG Copilot, Pydantic v2 Support Ticket Triage API, and 25-Case Golden Eval Gate** with a No-Login Next.js Live Demo (`$0` Free-Tier Stack).
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Vercel-000000?style=flat-square&logo=vercel)](https://enterprise-rag-ops-copilot.vercel.app/)
+[![API Health](https://img.shields.io/badge/API_Health-Render-46E3B7?style=flat-square&logo=render&logoColor=000)](https://enterprise-rag-ops-copilot-api.onrender.com/health)
+[![Pytest](https://img.shields.io/badge/Pytest-47%2F47_Passing-2EA44F?style=flat-square&logo=pytest&logoColor=white)](#golden-evaluation-gate-ci--live-production-verified)
+[![Golden Eval](https://img.shields.io/badge/Golden_Eval-25%2F25_Live_%26_CI-0969DA?style=flat-square)](#golden-evaluation-gate-ci--live-production-verified)
+[![Stack](https://img.shields.io/badge/Cost-%240_Free--Tier_Stack-6E40C9?style=flat-square)](#free-tier-deployment-guide-0-stack)
+
 🔗 **Live Demo:** [https://enterprise-rag-ops-copilot.vercel.app/](https://enterprise-rag-ops-copilot.vercel.app/)  
 🩺 **Live API Health:** [https://enterprise-rag-ops-copilot-api.onrender.com/health](https://enterprise-rag-ops-copilot-api.onrender.com/health)
 
-![Enterprise RAG Ops Copilot Walkthrough](docs/assets/demo-60s.gif)
+<p align="center">
+  <a href="https://enterprise-rag-ops-copilot.vercel.app/">
+    <img src="docs/assets/demo-60s.gif" alt="Enterprise RAG Ops Copilot Live Demo Walkthrough" width="100%" />
+  </a>
+  <br />
+  <sub><em>Click preview to open the No-Login Live Demo — Thai–English Hybrid RAG, 3-Stage $0 Guardrails, Pydantic v2 Ticket Triage &amp; 25-Case Golden Eval</em></sub>
+</p>
 
 ---
 
