@@ -86,12 +86,12 @@ def _sample_retrieval_chunk() -> RetrievalChunk:
 def test_settings_gemini_chat_model_chain_deduplicates_and_allows_empty() -> None:
     cfg = Settings(
         gemini_chat_model="gemini-3.8-flash",
-        gemini_fallback_models="gemini-2.5-flash, gemini-3.8-flash, gemini-2.5-flash-lite, ",
+        gemini_fallback_models="gemini-3.5-flash-lite, gemini-3.8-flash, gemini-3.1-flash-lite, ",
     )
     assert cfg.gemini_chat_model_chain == [
         "gemini-3.8-flash",
-        "gemini-2.5-flash",
-        "gemini-2.5-flash-lite",
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
     ]
 
     empty_cfg = Settings(
@@ -130,8 +130,8 @@ def test_rag_generator_fails_over_to_fallback_model_on_429() -> None:
     )
 
     called_models = [c.kwargs["model"] for c in mock_models.generate_content.call_args_list]
-    assert called_models == ["gemini-3.8-flash", "gemini-2.5-flash"]
-    assert result.model_name == "gemini-2.5-flash"
+    assert called_models == ["gemini-3.8-flash", "gemini-3.5-flash-lite"]
+    assert result.model_name == "gemini-3.5-flash-lite"
     assert result.used_fallback is False
     assert result.input_tokens == 180
     assert result.output_tokens == 32
@@ -160,8 +160,8 @@ def test_rag_generator_falls_back_to_extractive_when_all_models_429() -> None:
     called_models = [c.kwargs["model"] for c in mock_models.generate_content.call_args_list]
     assert called_models == [
         "gemini-3.8-flash",
-        "gemini-2.5-flash",
-        "gemini-2.5-flash-lite",
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
     ]
     assert result.model_name == "gemini-3.8-flash-429-fallback"
     assert result.used_fallback is True

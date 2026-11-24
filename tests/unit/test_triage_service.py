@@ -156,8 +156,8 @@ def test_triage_service_falls_back_on_429_resource_exhausted() -> None:
     called_models = [c.kwargs["model"] for c in mock_models.generate_content.call_args_list]
     assert called_models == [
         "gemini-3.8-flash",
-        "gemini-2.5-flash",
-        "gemini-2.5-flash-lite",
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
     ]
     assert mock_models.generate_content.call_count == 3
     assert result.model_name == "gemini-3.8-flash-429-fallback"
@@ -202,9 +202,9 @@ def test_triage_service_fails_over_to_fallback_model_on_429() -> None:
         )
     )
     called_models = [c.kwargs["model"] for c in mock_models.generate_content.call_args_list]
-    assert called_models == ["gemini-3.8-flash", "gemini-2.5-flash"]
+    assert called_models == ["gemini-3.8-flash", "gemini-3.5-flash-lite"]
     assert mock_models.generate_content.call_count == 2
-    assert result.model_name == "gemini-2.5-flash"
+    assert result.model_name == "gemini-3.5-flash-lite"
     assert result.validation_status == "pydantic_passed"
     assert result.requires_human_review is True
     assert result.estimated_cost_usd > 0.0
