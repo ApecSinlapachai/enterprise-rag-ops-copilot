@@ -17,6 +17,7 @@ import {
   Timer,
 } from "lucide-react";
 
+import { FormattedAnswer } from "@/components/FormattedAnswer";
 import { ApiError, queryRag } from "@/lib/api";
 import type { LanguageMode, RAGQueryResponse } from "@/lib/types";
 
@@ -307,8 +308,8 @@ export function RagWorkspace({ uiLang }: { uiLang: LanguageMode }) {
             )}
 
             {/* Answer Body */}
-            <div className="whitespace-pre-wrap rounded-xl border border-slate-800/80 bg-slate-950/70 p-4 text-sm leading-relaxed text-slate-100">
-              {result.answer}
+            <div className="rounded-xl border border-slate-800/80 bg-slate-950/70 p-4">
+              <FormattedAnswer text={result.answer} />
             </div>
 
             {/* Telemetry Strip */}

@@ -153,13 +153,63 @@ def test_triage_service_falls_back_on_429_resource_exhausted() -> None:
             source_channel="web_demo",
         )
     )
-    assert mock_models.generate_content.call_count == 2
+    called_models = [c.kwargs["model"] for c in mock_models.generate_content.call_args_list]
+    assert called_models == [
+        "gemini-3.8-flash",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+    ]
+    assert mock_models.generate_content.call_count == 3
+    assert result.model_name == "gemini-3.8-flash-429-fallback"
     assert result.validation_status == "deterministic_fallback"
     assert result.category == "billing_refund"
     assert result.suggested_team == "billing_ops"
     assert result.requires_human_review is True
     assert result.estimated_cost_usd == 0.0
     assert result.extracted_entities["invoice_id"] == "INV-2026-0091"
+
+
+def test_triage_service_fails_over_to_fallback_model_on_429() -> None:
+    cfg = Settings(gemini_api_key="live-placeholder-for-mocked-client")
+    service = TicketTriageService(cfg, db=None, force_mock=False)
+
+    llm_output = TriageTicketLLMOutput(
+        language_detected="mixed",
+        category="billing_refund",
+        urgency_score=3,
+        priority="P2",
+        sentiment="negative",
+        summary="Customer requested SLA credit refund for invoice INV-2026-0091.",
+        suggested_action="Verify uptime telemetry and route ticket to billing_ops.",
+        suggested_team="billing_ops",
+        requires_human_review=False,
+        extracted_entities=TriageExtractedEntitiesLLM(invoice_id="INV-2026-0091"),
+    )
+    usage = SimpleNamespace(prompt_token_count=140, candidates_token_count=55)
+    ok_response = SimpleNamespace(parsed=llm_output, text="", usage_metadata=usage)
+
+    mock_models = MagicMock()
+    mock_models.generate_content.side_effect = [
+        RuntimeError("429 RESOURCE_EXHAUSTED"),
+        ok_response,
+    ]
+    service._client = SimpleNamespace(models=mock_models)  # type: ignore[assignment]
+
+    result = service.triage(
+        TriageTicketRequest(
+            message="ขอคืนเงินเครดิตสำหรับใบแจ้งหนี้ INV-2026-0091 ของ ORG-DEMO-01",
+            source_channel="web_demo",
+        )
+    )
+    called_models = [c.kwargs["model"] for c in mock_models.generate_content.call_args_list]
+    assert called_models == ["gemini-3.8-flash", "gemini-2.5-flash"]
+    assert mock_models.generate_content.call_count == 2
+    assert result.model_name == "gemini-2.5-flash"
+    assert result.validation_status == "pydantic_passed"
+    assert result.requires_human_review is True
+    assert result.estimated_cost_usd > 0.0
+    assert result.extracted_entities["invoice_id"] == "INV-2026-0091"
+    assert result.extracted_entities["org_id"] == "ORG-DEMO-01"
 
 
 def test_ingest_endpoint_enforces_constant_time_admin_token(monkeypatch) -> None:

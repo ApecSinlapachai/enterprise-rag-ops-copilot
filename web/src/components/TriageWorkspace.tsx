@@ -156,8 +156,8 @@ export function TriageWorkspace({ uiLang }: { uiLang: LanguageMode }) {
               onChange={(e) => setMessage(e.target.value)}
               placeholder={
                 uiLang === "th"
-                  ? "วางข้อความ Ticket จากลูกค้า (5 - 1,500 ตัวอักษร)..."
-                  : "Paste an inbound customer support ticket (5 - 1,500 chars)..."
+                  ? "วางข้อความ Ticket จากลูกค้า (5–1,500 ตัวอักษร)..."
+                  : "Paste an inbound customer support ticket (5–1,500 chars)..."
               }
               className="w-full resize-none rounded-xl border border-slate-700 bg-slate-950/90 p-3.5 text-sm text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             />

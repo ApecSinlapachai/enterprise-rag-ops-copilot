@@ -11,7 +11,7 @@ from uuid import UUID, uuid4
 from google import genai
 from google.genai import types
 from psycopg.types.json import Jsonb
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from app.config import Settings
 from app.db import DatabaseManager
@@ -22,7 +22,11 @@ from app.schemas.triage import (
     TriageTicketResponse,
 )
 from app.services.embeddings import _is_placeholder_api_key
-from app.services.generator import estimate_llm_cost_usd
+from app.services.generator import (
+    classify_fallback_model_name,
+    estimate_llm_cost_usd,
+    is_rate_limit_error,
+)
 from app.services.guardrails import check_prompt_injection
 from app.services.tokenizer import detect_language
 
@@ -398,6 +402,7 @@ class TicketTriageService:
         self._settings = settings
         self._db = db
         self.model_name = settings.gemini_chat_model
+        self.model_chain = settings.gemini_chat_model_chain
         self._use_live_api = (not force_mock) and (
             not _is_placeholder_api_key(settings.gemini_api_key)
         )
@@ -410,10 +415,13 @@ class TicketTriageService:
         """Return True when configured to invoke the live Gemini API."""
         return self._client is not None
 
-    def _invoke_gemini_once(self, message: str) -> tuple[TriageTicketExtraction, int, int]:
+    def _invoke_gemini_once(
+        self, message: str, model_name: str | None = None
+    ) -> tuple[TriageTicketExtraction, int, int]:
         assert self._client is not None
+        target_model = model_name or self.model_name
         response = self._client.models.generate_content(
-            model=self.model_name,
+            model=target_model,
             contents=f"Inbound Support Message:\n{message}",
             config=types.GenerateContentConfig(
                 system_instruction=_TRIAGE_SYSTEM_PROMPT,
@@ -437,19 +445,20 @@ class TicketTriageService:
         return extraction, in_tok, out_tok
 
     def _invoke_gemini_with_retry(
-        self, message: str
+        self, message: str, model_name: str | None = None
     ) -> tuple[TriageTicketExtraction, int, int, int]:
         attempts = 0
 
         @retry(
             stop=stop_after_attempt(2),
             wait=wait_exponential(multiplier=0.2, min=0.2, max=1.0),
+            retry=retry_if_exception(lambda exc: not is_rate_limit_error(exc)),
             reraise=True,
         )
         def _run() -> tuple[TriageTicketExtraction, int, int]:
             nonlocal attempts
             attempts += 1
-            return self._invoke_gemini_once(message)
+            return self._invoke_gemini_once(message, model_name=model_name)
 
         extraction, in_tok, out_tok = _run()
         return extraction, in_tok, out_tok, attempts
@@ -478,25 +487,50 @@ class TicketTriageService:
             out_tok = 0
             cost_usd = 0.0
         else:
-            try:
-                raw_extraction, in_tok, out_tok, attempts = self._invoke_gemini_with_retry(
-                    payload.message
+            last_exc: Exception | None = None
+            saw_429 = False
+            succeeded = False
+            for idx, model_candidate in enumerate(self.model_chain):
+                try:
+                    raw_extraction, in_tok, out_tok, attempts = self._invoke_gemini_with_retry(
+                        payload.message, model_name=model_candidate
+                    )
+                    extraction = _enforce_triage_invariants(raw_extraction, payload.message)
+                    validation_status = "repaired_retry" if attempts > 1 else "pydantic_passed"
+                    model_used = model_candidate
+                    cost_usd = estimate_llm_cost_usd(in_tok, out_tok)
+                    succeeded = True
+                    break
+                except Exception as exc:
+                    last_exc = exc
+                    saw_429 = saw_429 or is_rate_limit_error(exc)
+                    has_next = idx + 1 < len(self.model_chain)
+                    logger.warning(
+                        "Gemini triage failed on model %s (%s: %s)%s.",
+                        model_candidate,
+                        type(exc).__name__,
+                        exc,
+                        "; trying next fallback model"
+                        if has_next
+                        else "; no fallback models left",
+                    )
+
+            if not succeeded:
+                assert last_exc is not None
+                model_used = (
+                    f"{self.model_name}-429-fallback"
+                    if saw_429
+                    else classify_fallback_model_name(self.model_name, last_exc)
                 )
-                extraction = _enforce_triage_invariants(raw_extraction, payload.message)
-                validation_status = "repaired_retry" if attempts > 1 else "pydantic_passed"
-                model_used = self.model_name
-                cost_usd = estimate_llm_cost_usd(in_tok, out_tok)
-            except Exception as exc:
                 logger.warning(
-                    "Gemini triage failed after retry (%s); using deterministic fallback.",
-                    exc,
+                    "All Gemini triage models failed; using deterministic fallback (%s).",
+                    model_used,
                 )
                 extraction = _enforce_triage_invariants(
                     build_deterministic_triage(payload.message),
                     payload.message,
                 ).model_copy(update={"requires_human_review": True})
                 validation_status = "deterministic_fallback"
-                model_used = f"{self.model_name}-429-fallback"
                 in_tok = 0
                 out_tok = 0
                 cost_usd = 0.0

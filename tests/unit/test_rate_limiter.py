@@ -90,6 +90,7 @@ def test_http_429_with_retry_after_on_rag_and_triage_routes() -> None:
         rate_limit_per_day=5,
     )
     app = create_app(settings=settings)
+    app.state.triage_service._db = None  # Keep unit test DB-independent
     client = TestClient(app)
 
     # First request from IP A succeeds (Stage 0 injection gate avoids DB dependency).
@@ -127,6 +128,7 @@ def test_cors_exposes_retry_after_header_on_429() -> None:
         rate_limit_per_day=5,
     )
     app = create_app(settings=settings)
+    app.state.triage_service._db = None  # Keep unit test DB-independent
     client = TestClient(app)
 
     headers = {
