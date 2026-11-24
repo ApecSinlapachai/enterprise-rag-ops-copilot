@@ -2,11 +2,11 @@
 
 > **Production-Minded Thai–English Hybrid RAG Copilot, Pydantic v2 Support Ticket Triage API, and 25-Case Golden Eval Gate** with a No-Login Next.js Live Demo (`$0` Free-Tier Stack).
 
-[![Live Demo](https://img.shields.io/badge/Live_Demo-Vercel-000000?style=flat-square&logo=vercel)](https://enterprise-rag-ops-copilot.vercel.app/)
-[![API Health](https://img.shields.io/badge/API_Health-Render-46E3B7?style=flat-square&logo=render&logoColor=000)](https://enterprise-rag-ops-copilot-api.onrender.com/health)
-[![Pytest](https://img.shields.io/badge/Pytest-47%2F47_Passing-2EA44F?style=flat-square&logo=pytest&logoColor=white)](#golden-evaluation-gate-ci--live-production-verified)
-[![Golden Eval](https://img.shields.io/badge/Golden_Eval-25%2F25_Live_%26_CI-0969DA?style=flat-square)](#golden-evaluation-gate-ci--live-production-verified)
-[![Stack](https://img.shields.io/badge/Cost-%240_Free--Tier_Stack-6E40C9?style=flat-square)](#free-tier-deployment-guide-0-stack)
+[![Live Demo](https://img.shields.io/static/v1?label=Live%20Demo&message=Vercel&color=000000&style=flat-square&logo=vercel)](https://enterprise-rag-ops-copilot.vercel.app/)
+[![API Health](https://img.shields.io/static/v1?label=API%20Health&message=Render&color=46E3B7&style=flat-square&logo=render&logoColor=000)](https://enterprise-rag-ops-copilot-api.onrender.com/health)
+[![Pytest](https://img.shields.io/static/v1?label=Pytest&message=47%2F47%20Passing&color=2EA44F&style=flat-square&logo=pytest&logoColor=white)](#golden-evaluation-gate-ci--live-production-verified)
+[![Golden Eval](https://img.shields.io/static/v1?label=Golden%20Eval&message=25%2F25%20Live%20%26%20CI&color=0969DA&style=flat-square)](#golden-evaluation-gate-ci--live-production-verified)
+[![Stack](https://img.shields.io/static/v1?label=Cost&message=%240%20Free-Tier%20Stack&color=6E40C9&style=flat-square)](#free-tier-deployment-guide-0-stack)
 
 🔗 **Live Demo:** [https://enterprise-rag-ops-copilot.vercel.app/](https://enterprise-rag-ops-copilot.vercel.app/)  
 🩺 **Live API Health:** [https://enterprise-rag-ops-copilot-api.onrender.com/health](https://enterprise-rag-ops-copilot-api.onrender.com/health)
