@@ -2,6 +2,9 @@
 
 > **Production-Minded Thai–English Hybrid RAG Copilot, Pydantic v2 Support Ticket Triage API, and 25-Case Golden Eval Gate** with a No-Login Next.js Live Demo (`$0` Free-Tier Stack).
 
+🔗 **Live Demo:** [https://enterprise-rag-ops-copilot.vercel.app/](https://enterprise-rag-ops-copilot.vercel.app/)  
+🩺 **Live API Health:** [https://enterprise-rag-ops-copilot-api.onrender.com/health](https://enterprise-rag-ops-copilot-api.onrender.com/health)
+
 ![Enterprise RAG Ops Copilot Walkthrough](docs/assets/demo-60s.gif)
 
 ---
@@ -9,13 +12,14 @@
 ## ✨ Core Capabilities
 
 - **Thai–English Hybrid Search (`pgvector` + `PyThaiNLP` + `pg_trgm` RRF):** Combines 1536-dim L2-normalized `gemini-embedding-001` cosine search, PyThaiNLP (`newmm`) word-segmented PostgreSQL `tsvector` FTS with B2B SaaS domain stopword filtering, and `pg_trgm` exact SKU/error-code boosting (`INV-2026-0091`, `ERR-503`, `ERR-AUTH-403`) via Reciprocal Rank Fusion (`0.6 / (60 + vec_rank) + 0.4 / (60 + fts_rank)`).
+- **Tiered Gemini 3.x Model Routing & Resilience:** Routes default RAG and triage requests to the Fast Path (`gemini-3.5-flash-lite`) and escalates multi-doc/comparison/gray-zone RAG or PDPA/multi-entity triage to the Complex Path (`gemini-3.8-flash`), with automatic `gemini-3.1-flash-lite` fallback and deterministic grounded extractive / rule-based fallbacks on `429 RESOURCE_EXHAUSTED`.
 - **3-Stage Anti-Hallucination & Security Guardrails:**
   - **Stage 0 (Injection Gate — `$0` LLM spend):** Deterministic bilingual regex screen blocking English & Thai prompt injections (`BLOCKED_INJECTION`).
   - **Stage 1 (Pre-LLM Retrieval Gate — `$0` LLM spend):** Refuses low-evidence queries (`max_vec_similarity < 0.58` and `max_fts_rank < 0.08`) before calling Gemini (`REFUSED_LOW_EVIDENCE`).
   - **Stage 2 (Post-LLM Groundedness Gate):** Verifies `cited_chunk_ids` against retrieved PostgreSQL UUIDs and enforces `confidence_score >= 0.55`; overrides ungrounded responses with zero fabricated citations.
-- **Pydantic v2 Structured Ticket Triage:** Enforces strict enums, `StrictInt` urgency (`1–5`), deterministic synthetic entity extraction, `tenacity` retry (`repaired_retry`), and automatic bilingual fallback (`deterministic_fallback`).
+- **Pydantic v2 Structured Ticket Triage:** Enforces strict enums, `StrictInt` urgency (`1–5`), explicit Gemini-compatible entity schema (`TriageTicketLLMOutput`), deterministic synthetic entity extraction, `tenacity` retry (`repaired_retry`), and automatic bilingual fallback (`deterministic_fallback`).
 - **Public No-Login Demo Guardrails:** Thread-safe SHA-256 IP-hashed sliding-window rate limiter (`15 req/min`, `60 req/day`, bounded key memory) with `Retry-After` HTTP `429` headers (exposed via CORS), strict payload bounds (`500` chars RAG / `1500` chars Triage), synchronous FastAPI threadpool handlers for `psycopg_pool`, and `/health` cold-start warm-up ping.
-- **Automated 25-Case Golden Eval Gate & CI:** Evaluates 6 Thai, 5 English, 4 Code-Mixed, 4 Out-of-Scope, 3 Prompt Injection, and 3 Ticket Triage cases in GitHub Actions (`ruff`, `pytest`, PostgreSQL 16 DDL, Docker build, Next.js build).
+- **Automated 25-Case Golden Eval Gate & 47-Test CI:** Evaluates 6 Thai, 5 English, 4 Code-Mixed, 4 Out-of-Scope, 3 Prompt Injection, and 3 Ticket Triage cases alongside `47/47` verified `pytest` tests in GitHub Actions (`ruff`, `pytest`, PostgreSQL 16 DDL, Docker build, Next.js build).
 
 ---
 
@@ -29,7 +33,7 @@ flowchart LR
     S0 -->|"Clean"| RET["Hybrid RRF Retriever<br/>pgvector 1536d + PyThaiNLP FTS + pg_trgm"]
     RET --> S1{"Stage 1:<br/>Pre-LLM Gate<br/>(vec>=0.58 or fts>=0.08)"}
     S1 -->|"Refused ($0)"| LOG
-    S1 -->|"Evidence Found"| LLM["Gemini 3.8 Flash Structured Output<br/>(+ Grounded Extractive Fallback)"]
+    S1 -->|"Evidence Found"| LLM["Tiered Gemini 3.x Routing<br/>(3.5-flash-lite / 3.8-flash + 3.1-flash-lite + fallback)"]
     LLM --> S2{"Stage 2:<br/>UUID Citation & Confidence Gate"}
     S2 --> LOG
     RL -->|"POST /api/v1/triage"| TRI["TicketTriageService<br/>(Pydantic v2 + tenacity + fallback)"]
@@ -38,16 +42,16 @@ flowchart LR
 
 ---
 
-## 📊 Golden Evaluation Gate (`ci_mock` Mode Verified)
+## 📊 Golden Evaluation Gate (CI & Live Production Verified)
 
-| Metric | Target | Verified Result |
-| :--- | :---: | :---: |
-| **Total Cases** | `25` (6 TH, 5 EN, 4 Mixed, 4 OOS, 3 Injection, 3 Triage) | **25 / 25** |
-| **Citation Hit Rate** | `>= 0.8500` | **1.0000** |
-| **Refusal Precision** | `= 1.0000` | **1.0000** |
-| **Injection Block Rate** | `= 1.0000` | **1.0000** |
-| **JSON Schema Pass Rate** | `= 1.0000` | **1.0000** |
-| **Avg / P95 Latency** | `<= 250 ms` | **36 ms / 48 ms** |
+| Metric | Target | `ci_mock` Mode | Live Production (`production-live-38`) |
+| :--- | :---: | :---: | :---: |
+| **Total Cases** | `25` (6 TH, 5 EN, 4 Mixed, 4 OOS, 3 Injection, 3 Triage) | **25 / 25** | **25 / 25** |
+| **Citation Hit Rate** | `>= 0.8500` | **1.0000** | **1.0000** |
+| **Refusal Precision** | `= 1.0000` | **1.0000** | **1.0000** |
+| **Injection Block Rate** | `= 1.0000` | **1.0000** | **1.0000** |
+| **JSON Schema Pass Rate** | `= 1.0000` | **1.0000** | **1.0000** |
+| **Avg / P95 Latency** | `<= 250 ms` (`ci_mock`) / `<= 3500 ms` (`live_gemini`) | **36 ms / 48 ms** | **767 ms / 1516 ms** |
 
 ---
 

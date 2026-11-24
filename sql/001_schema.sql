@@ -8,12 +8,15 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- Shared updated_at trigger function
 CREATE OR REPLACE FUNCTION set_updated_at()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
 BEGIN
-    NEW.updated_at = NOW();
+    NEW.updated_at = pg_catalog.now();
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- ----------------------------------------------------------------------------
 -- 1. Source Knowledge Documents (SOPs, SLAs, Runbooks, Policies)

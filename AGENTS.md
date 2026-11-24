@@ -109,6 +109,7 @@ enterprise-rag-ops-copilot/
        - Fast Path (default): `gemini-3.5-flash-lite` → `gemini-3.1-flash-lite` → `gemini-3.8-flash` (`GEMINI_CHAT_MODEL` + `GEMINI_FALLBACK_MODELS`).
        - Complex Path (`should_use_complex_rag_model` / `should_use_complex_triage_model` for comparison/multi-doc/gray-zone RAG or PDPA/multi-entity triage): `gemini-3.8-flash` → `gemini-3.5-flash-lite` → `gemini-3.1-flash-lite` (`GEMINI_COMPLEX_MODEL` first).
        - Tiered token cost estimation in `estimate_llm_cost_usd` (`lite` vs standard Flash rates).
+       - Render Dashboard env vars verified against `render.yaml` (`GEMINI_CHAT_MODEL=gemini-3.5-flash-lite`, `GEMINI_COMPLEX_MODEL=gemini-3.8-flash`, `GEMINI_FALLBACK_MODELS=gemini-3.1-flash-lite`).
      - Verified `ruff check app ../tests ../scripts ../eval` (0 errors), `pytest -v` (**47/47** passing: 42 unit + 3 live PG16 integration + 2 Golden Eval Gate tests), `docker compose config -q` (clean), and `web/` `npx tsc --noEmit && npm run build` (clean).
   6. **Portfolio Wrap-up Items:** Re-verify `https://enterprise-rag-ops-copilot.vercel.app/` after Render finishes rebuilding, pin repo on `github.com/ApecSinlapachai`, and export anonymized learnings back to AI OS (`client-project-bridge`).
 
