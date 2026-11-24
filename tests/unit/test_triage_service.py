@@ -155,12 +155,12 @@ def test_triage_service_falls_back_on_429_resource_exhausted() -> None:
     )
     called_models = [c.kwargs["model"] for c in mock_models.generate_content.call_args_list]
     assert called_models == [
-        "gemini-3.8-flash",
         "gemini-3.5-flash-lite",
         "gemini-3.1-flash-lite",
+        "gemini-3.8-flash",
     ]
     assert mock_models.generate_content.call_count == 3
-    assert result.model_name == "gemini-3.8-flash-429-fallback"
+    assert result.model_name == "gemini-3.5-flash-lite-429-fallback"
     assert result.validation_status == "deterministic_fallback"
     assert result.category == "billing_refund"
     assert result.suggested_team == "billing_ops"
@@ -202,9 +202,9 @@ def test_triage_service_fails_over_to_fallback_model_on_429() -> None:
         )
     )
     called_models = [c.kwargs["model"] for c in mock_models.generate_content.call_args_list]
-    assert called_models == ["gemini-3.8-flash", "gemini-3.5-flash-lite"]
+    assert called_models == ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
     assert mock_models.generate_content.call_count == 2
-    assert result.model_name == "gemini-3.5-flash-lite"
+    assert result.model_name == "gemini-3.1-flash-lite"
     assert result.validation_status == "pydantic_passed"
     assert result.requires_human_review is True
     assert result.estimated_cost_usd > 0.0
@@ -263,7 +263,8 @@ def test_triage_llm_schema_omits_additional_properties_and_converts() -> None:
     assert not _has_schema_key(TriageTicketLLMOutput.model_json_schema(), "additionalProperties")
 
     cfg = Settings(gemini_api_key="live-placeholder-for-mocked-client")
-    assert cfg.gemini_chat_model == "gemini-3.8-flash"
+    assert cfg.gemini_chat_model == "gemini-3.5-flash-lite"
+    assert cfg.gemini_complex_model == "gemini-3.8-flash"
     service = TicketTriageService(cfg, db=None, force_mock=False)
 
     llm_output = TriageTicketLLMOutput(
@@ -295,13 +296,48 @@ def test_triage_llm_schema_omits_additional_properties_and_converts() -> None:
         )
     )
     call_kwargs = mock_models.generate_content.call_args.kwargs
-    assert call_kwargs["model"] == "gemini-3.8-flash"
+    assert call_kwargs["model"] == "gemini-3.5-flash-lite"
     assert call_kwargs["config"].response_schema is TriageTicketLLMOutput
     assert result.validation_status == "pydantic_passed"
-    assert result.model_name == "gemini-3.8-flash"
+    assert result.model_name == "gemini-3.5-flash-lite"
     assert result.requires_human_review is True
     assert result.extracted_entities == {
         "invoice_id": "INV-2026-0091",
         "sku": "SKU-ENT-ANNUAL",
         "org_id": "ORG-DEMO-01",
     }
+
+
+def test_triage_service_routes_complex_ticket_to_complex_model() -> None:
+    cfg = Settings(gemini_api_key="live-placeholder-for-mocked-client")
+    service = TicketTriageService(cfg, db=None, force_mock=False)
+
+    llm_output = TriageTicketLLMOutput(
+        language_detected="mixed",
+        category="sla_escalation",
+        urgency_score=5,
+        priority="P0",
+        sentiment="negative",
+        summary="PDPA compliance and data breach escalation for ORG-DEMO-01.",
+        suggested_action="Escalate immediately to security_ops and legal compliance.",
+        suggested_team="security_ops",
+        requires_human_review=True,
+        extracted_entities=TriageExtractedEntitiesLLM(org_id="ORG-DEMO-01"),
+    )
+    usage = SimpleNamespace(prompt_token_count=200, candidates_token_count=70)
+    ok_response = SimpleNamespace(parsed=llm_output, text="", usage_metadata=usage)
+
+    mock_models = MagicMock()
+    mock_models.generate_content.return_value = ok_response
+    service._client = SimpleNamespace(models=mock_models)  # type: ignore[assignment]
+
+    result = service.triage(
+        TriageTicketRequest(
+            message="Urgent PDPA compliance data breach escalation for ORG-DEMO-01.",
+            source_channel="email",
+        )
+    )
+    call_kwargs = mock_models.generate_content.call_args.kwargs
+    assert call_kwargs["model"] == "gemini-3.8-flash"
+    assert result.model_name == "gemini-3.8-flash"
+    assert result.validation_status == "pydantic_passed"

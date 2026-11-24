@@ -60,7 +60,7 @@ enterprise-rag-ops-copilot/
 │   ├── run_eval.py                     # [DONE Day 7] Eval runner (ci_mock, hybrid_replay & live_gemini)
 │   └── thresholds.json                 # [DONE Day 7] CI pass/fail thresholds
 ├── tests/
-│   ├── unit/                           # [DONE Day 1-14: 39 tests]
+│   ├── unit/                           # [DONE Day 1-14: 42 tests]
 │   ├── integration/                    # [DONE Day 2-5: 3 live PG16 pgvector + RRF + RAG pipeline tests]
 │   └── eval/                           # [DONE Day 8: 2 Golden Eval Gate tests]
 ├── web/                                # [DONE Day 9-12] Next.js 15 App Router + Tailwind CSS (No-Login Live Demo)
@@ -103,11 +103,13 @@ enterprise-rag-ops-copilot/
   2. **Resolved Bug #1 — Chat Model Upgraded (`gemini-2.5-flash` → `gemini-3.8-flash`):** Updated `gemini_chat_model` default and references across `api/app/config.py`, `.env.example`, `render.yaml`, `docker-compose.yml`, `api/app/services/generator.py`, `tests/unit/test_pydantic_triage_schema.py`, `README.md`, `web/src/app/page.tsx`, and `AGENTS.md`.
   3. **Resolved Bug #2 — Triage Schema `additionalProperties` Compatibility:** Added `TriageExtractedEntitiesLLM` (explicit optional `invoice_id`, `org_id`, `error_code`, `sku`, `incident_id` fields) and `TriageTicketLLMOutput` in `api/app/schemas/triage.py`, updated `TicketTriageService._invoke_gemini_once` (`api/app/services/triage_service.py`) to pass `response_schema=TriageTicketLLMOutput` and convert back to `TriageTicketExtraction` while preserving the 1:1 `TriageTicketResponse` / SQL `triage_tickets` contract and merging deterministic `extract_ticket_entities`.
   4. **Live Browser Check Completed (`https://enterprise-rag-ops-copilot.vercel.app/`):** Verified end-to-end with zero console/network errors (`API Ready (v0.1.0)`, CORS & HTTP `200` across `/health`, `/api/v1/rag/query`, `/api/v1/triage`, `/api/v1/eval/latest`, `/api/v1/documents`, and TH/EN toggle). Diagnosed Render `429 RESOURCE_EXHAUSTED` from Free Tier daily cap (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`, `limit: 20/day`).
-  5. **UI Polish, Fallback Hardening & Gemini Fallback Model Chain (`2026-11-24`):**
+  5. **UI Polish, Fallback Hardening & Tiered Gemini Model Routing (`2026-11-24`):**
      - Added `_truncate_cleanly()`, `is_rate_limit_error()`, and `classify_fallback_model_name()` in `api/app/services/generator.py`, plus `FormattedAnswer.tsx` (`RagWorkspace.tsx`) and `(5–1,500)` placeholder fix (`TriageWorkspace.tsx`).
-     - Added configurable `GEMINI_FALLBACK_MODELS` (`gemini-3.5-flash-lite,gemini-3.1-flash-lite`) and `Settings.gemini_chat_model_chain` in `api/app/config.py`, `.env.example`, `render.yaml`, and `docker-compose.yml`.
-     - Wired `model_chain` failover into `RAGGenerator.generate` (`api/app/services/generator.py`) and `TicketTriageService.triage` (`api/app/services/triage_service.py`) so `429 RESOURCE_EXHAUSTED` fails over immediately to the next Gemini model before falling back to extractive/deterministic mode.
-     - Verified `ruff check app ../tests ../scripts ../eval` (0 errors), `pytest -v` (**44/44** passing: 39 unit + 3 live PG16 integration + 2 Golden Eval Gate tests), `docker compose config -q` (clean), and `web/` `npx tsc --noEmit && npm run build` (clean).
+     - Implemented Tiered Gemini Model Routing across `api/app/config.py`, `.env.example`, `render.yaml`, `docker-compose.yml`, `api/app/services/generator.py`, and `api/app/services/triage_service.py`:
+       - Fast Path (default): `gemini-3.5-flash-lite` → `gemini-3.1-flash-lite` → `gemini-3.8-flash` (`GEMINI_CHAT_MODEL` + `GEMINI_FALLBACK_MODELS`).
+       - Complex Path (`should_use_complex_rag_model` / `should_use_complex_triage_model` for comparison/multi-doc/gray-zone RAG or PDPA/multi-entity triage): `gemini-3.8-flash` → `gemini-3.5-flash-lite` → `gemini-3.1-flash-lite` (`GEMINI_COMPLEX_MODEL` first).
+       - Tiered token cost estimation in `estimate_llm_cost_usd` (`lite` vs standard Flash rates).
+     - Verified `ruff check app ../tests ../scripts ../eval` (0 errors), `pytest -v` (**47/47** passing: 42 unit + 3 live PG16 integration + 2 Golden Eval Gate tests), `docker compose config -q` (clean), and `web/` `npx tsc --noEmit && npm run build` (clean).
   6. **Portfolio Wrap-up Items:** Re-verify `https://enterprise-rag-ops-copilot.vercel.app/` after Render finishes rebuilding, pin repo on `github.com/ApecSinlapachai`, and export anonymized learnings back to AI OS (`client-project-bridge`).
 
 ---

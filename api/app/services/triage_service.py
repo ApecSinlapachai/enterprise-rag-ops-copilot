@@ -60,6 +60,17 @@ _TRIAGE_SYSTEM_PROMPT = (
 )
 
 
+_COMPLEX_TRIAGE_KEYWORDS: tuple[str, ...] = (
+    "pdpa",
+    "gdpr",
+    "legal",
+    "breach",
+    "compliance",
+    "กฎหมาย",
+    "ละเมิดข้อมูล",
+)
+
+
 def extract_ticket_entities(message: str) -> dict[str, str]:
     """Extract deterministic synthetic IDs (invoice, org, error code, SKU, incident)."""
     entities: dict[str, str] = {}
@@ -68,6 +79,17 @@ def extract_ticket_entities(message: str) -> dict[str, str]:
         if match:
             entities[key] = match.group(0).upper()
     return entities
+
+
+def should_use_complex_triage_model(message: str) -> bool:
+    """Route long, multi-entity, or legal/compliance tickets to the complex tier."""
+    stripped = message.strip()
+    if len(stripped) > 450:
+        return True
+    if len(extract_ticket_entities(stripped)) >= 3:
+        return True
+    lowered = stripped.lower()
+    return any(kw in lowered for kw in _COMPLEX_TRIAGE_KEYWORDS)
 
 
 def _normalize_triage_language(text: str) -> TriageLanguage:
@@ -402,7 +424,9 @@ class TicketTriageService:
         self._settings = settings
         self._db = db
         self.model_name = settings.gemini_chat_model
-        self.model_chain = settings.gemini_chat_model_chain
+        self.fast_model_chain = settings.gemini_chat_model_chain
+        self.complex_model_chain = settings.gemini_complex_model_chain
+        self.model_chain = self.fast_model_chain
         self._use_live_api = (not force_mock) and (
             not _is_placeholder_api_key(settings.gemini_api_key)
         )
@@ -468,6 +492,9 @@ class TicketTriageService:
         start_ns = time.perf_counter_ns()
         request_id = f"tri-{uuid4().hex[:12]}"
         lang = _normalize_triage_language(payload.message)
+        is_complex = should_use_complex_triage_model(payload.message)
+        active_chain = self.complex_model_chain if is_complex else self.fast_model_chain
+        primary_model = active_chain[0] if active_chain else self.model_name
 
         # Stage 0: Intercept prompt injection attempts deterministically at $0 LLM cost.
         injection_decision = check_prompt_injection(payload.message, query_language=lang)
@@ -479,9 +506,9 @@ class TicketTriageService:
             extraction = extraction.model_copy(update={"requires_human_review": True})
             validation_status: ValidationStatus = "deterministic_fallback"
             model_used = (
-                f"{self.model_name}-injection-guard"
+                f"{primary_model}-injection-guard"
                 if injection_decision.blocked
-                else f"{self.model_name}-deterministic-fallback"
+                else f"{primary_model}-deterministic-fallback"
             )
             in_tok = 0
             out_tok = 0
@@ -490,7 +517,7 @@ class TicketTriageService:
             last_exc: Exception | None = None
             saw_429 = False
             succeeded = False
-            for idx, model_candidate in enumerate(self.model_chain):
+            for idx, model_candidate in enumerate(active_chain):
                 try:
                     raw_extraction, in_tok, out_tok, attempts = self._invoke_gemini_with_retry(
                         payload.message, model_name=model_candidate
@@ -498,13 +525,15 @@ class TicketTriageService:
                     extraction = _enforce_triage_invariants(raw_extraction, payload.message)
                     validation_status = "repaired_retry" if attempts > 1 else "pydantic_passed"
                     model_used = model_candidate
-                    cost_usd = estimate_llm_cost_usd(in_tok, out_tok)
+                    cost_usd = estimate_llm_cost_usd(
+                        in_tok, out_tok, model_name=model_candidate
+                    )
                     succeeded = True
                     break
                 except Exception as exc:
                     last_exc = exc
                     saw_429 = saw_429 or is_rate_limit_error(exc)
-                    has_next = idx + 1 < len(self.model_chain)
+                    has_next = idx + 1 < len(active_chain)
                     logger.warning(
                         "Gemini triage failed on model %s (%s: %s)%s.",
                         model_candidate,
@@ -518,9 +547,9 @@ class TicketTriageService:
             if not succeeded:
                 assert last_exc is not None
                 model_used = (
-                    f"{self.model_name}-429-fallback"
+                    f"{primary_model}-429-fallback"
                     if saw_429
-                    else classify_fallback_model_name(self.model_name, last_exc)
+                    else classify_fallback_model_name(primary_model, last_exc)
                 )
                 logger.warning(
                     "All Gemini triage models failed; using deterministic fallback (%s).",

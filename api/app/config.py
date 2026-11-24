@@ -23,8 +23,9 @@ class Settings(BaseSettings):
         default="postgresql://postgres:postgres@localhost:5432/rag_ops"
     )
     gemini_api_key: str = Field(default="your-gemini-api-key-here")
-    gemini_chat_model: str = Field(default="gemini-3.8-flash")
-    gemini_fallback_models: str = Field(default="gemini-3.5-flash-lite,gemini-3.1-flash-lite")
+    gemini_chat_model: str = Field(default="gemini-3.5-flash-lite")
+    gemini_complex_model: str = Field(default="gemini-3.8-flash")
+    gemini_fallback_models: str = Field(default="gemini-3.1-flash-lite")
     gemini_embed_model: str = Field(default="gemini-embedding-001")
     gemini_embed_dim: int = Field(default=1536, ge=128, le=3072)
 
@@ -44,20 +45,32 @@ class Settings(BaseSettings):
         """Parse comma-separated CORS origins into a clean list."""
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
-    @property
-    def gemini_chat_model_chain(self) -> list[str]:
-        """Return deduplicated ordered chat models: primary followed by fallback models."""
-        ordered = [self.gemini_chat_model.strip()]
-        ordered.extend(
-            model.strip() for model in self.gemini_fallback_models.split(",") if model.strip()
-        )
+    @staticmethod
+    def _dedupe_models(models: list[str]) -> list[str]:
         seen: set[str] = set()
         chain: list[str] = []
-        for model in ordered:
-            if model and model not in seen:
-                seen.add(model)
-                chain.append(model)
+        for model in models:
+            cleaned = model.strip()
+            if cleaned and cleaned not in seen:
+                seen.add(cleaned)
+                chain.append(cleaned)
         return chain
+
+    @property
+    def gemini_chat_model_chain(self) -> list[str]:
+        """Return deduplicated fast-path models: primary Lite, fallbacks, then complex."""
+        fallbacks = [m.strip() for m in self.gemini_fallback_models.split(",") if m.strip()]
+        return self._dedupe_models(
+            [self.gemini_chat_model, *fallbacks, self.gemini_complex_model]
+        )
+
+    @property
+    def gemini_complex_model_chain(self) -> list[str]:
+        """Return deduplicated complex-path models: complex first, then fast & fallbacks."""
+        fallbacks = [m.strip() for m in self.gemini_fallback_models.split(",") if m.strip()]
+        return self._dedupe_models(
+            [self.gemini_complex_model, self.gemini_chat_model, *fallbacks]
+        )
 
 
 @lru_cache

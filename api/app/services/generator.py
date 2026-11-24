@@ -17,9 +17,28 @@ from app.services.retriever import RetrievalChunk
 
 logger = logging.getLogger(__name__)
 
-# Approximate Gemini 3.8 Flash public pricing per 1M tokens for cost observability.
+# Approximate Gemini Flash vs Flash-Lite public pricing per 1M tokens for cost observability.
 _INPUT_USD_PER_M = 0.15
 _OUTPUT_USD_PER_M = 0.60
+_LITE_INPUT_USD_PER_M = 0.075
+_LITE_OUTPUT_USD_PER_M = 0.30
+
+_COMPLEX_RAG_KEYWORDS: tuple[str, ...] = (
+    "เปรียบเทียบ",
+    "ต่างกัน",
+    "แตกต่าง",
+    "compare",
+    "comparison",
+    " vs ",
+    " vs.",
+    " versus ",
+    "trade-off",
+    "tradeoff",
+    "ขั้นตอนทั้งหมด",
+    "สรุปทั้งหมด",
+    "root cause",
+    "rca",
+)
 
 _RAG_SYSTEM_PROMPT = (
     "You are an Enterprise B2B SaaS Operations Copilot. "
@@ -63,12 +82,49 @@ def classify_fallback_model_name(model_name: str, exc: Exception) -> str:
     return f"{model_name}-error-fallback"
 
 
-def estimate_llm_cost_usd(input_tokens: int, output_tokens: int) -> float:
-    """Estimate USD cost for token usage telemetry."""
-    cost = (input_tokens / 1_000_000.0) * _INPUT_USD_PER_M + (
+def estimate_llm_cost_usd(
+    input_tokens: int, output_tokens: int, model_name: str = ""
+) -> float:
+    """Estimate USD cost for token usage telemetry based on model tier."""
+    is_lite = "lite" in model_name.lower()
+    in_rate = _LITE_INPUT_USD_PER_M if is_lite else _INPUT_USD_PER_M
+    out_rate = _LITE_OUTPUT_USD_PER_M if is_lite else _OUTPUT_USD_PER_M
+    cost = (input_tokens / 1_000_000.0) * in_rate + (
         output_tokens / 1_000_000.0
-    ) * _OUTPUT_USD_PER_M
+    ) * out_rate
     return round(max(0.0, cost), 6)
+
+
+def should_use_complex_rag_model(
+    query: str,
+    chunks: Sequence[RetrievalChunk],
+    *,
+    min_vec_similarity: float = 0.58,
+) -> bool:
+    """Deterministically route complex, multi-doc, or gray-zone queries to complex tier."""
+    stripped = query.strip()
+    if len(stripped) > 120 or stripped.count("?") >= 2:
+        return True
+
+    lowered = stripped.lower()
+    if any(kw in lowered for kw in _COMPLEX_RAG_KEYWORDS):
+        return True
+
+    if not chunks:
+        return False
+
+    top_rrf = chunks[0].citation.rrf_score
+    top_source = chunks[0].citation.source_key
+    for chunk in chunks[1:3]:
+        if chunk.citation.source_key != top_source and chunk.citation.rrf_score >= top_rrf * 0.75:
+            return True
+
+    max_vec = max(c.citation.vec_similarity for c in chunks)
+    max_fts = max(c.citation.fts_rank for c in chunks)
+    if min_vec_similarity <= max_vec < (min_vec_similarity + 0.12) and max_fts < 0.25:
+        return True
+
+    return False
 
 
 def _format_context_prompt(query: str, chunks: Sequence[RetrievalChunk]) -> str:
@@ -175,7 +231,9 @@ class RAGGenerator:
     def __init__(self, settings: Settings, force_mock: bool = False) -> None:
         self._settings = settings
         self.model_name = settings.gemini_chat_model
-        self.model_chain = settings.gemini_chat_model_chain
+        self.fast_model_chain = settings.gemini_chat_model_chain
+        self.complex_model_chain = settings.gemini_complex_model_chain
+        self.model_chain = self.fast_model_chain
         self._use_live_api = (not force_mock) and (
             not _is_placeholder_api_key(settings.gemini_api_key)
         )
@@ -197,6 +255,14 @@ class RAGGenerator:
     ) -> GenerationResult:
         """Generate a citation-grounded structured response over retrieved chunks."""
         start_ns = time.perf_counter_ns()
+        is_complex = should_use_complex_rag_model(
+            query,
+            chunks,
+            min_vec_similarity=self._settings.min_vec_similarity,
+        )
+        active_chain = self.complex_model_chain if is_complex else self.fast_model_chain
+        primary_model = active_chain[0] if active_chain else self.model_name
+
         if not chunks:
             elapsed_ms = max(0, int((time.perf_counter_ns() - start_ns) // 1_000_000))
             return GenerationResult(
@@ -207,7 +273,7 @@ class RAGGenerator:
                     cited_chunk_ids=[],
                     refusal_reason="No chunks provided to generator.",
                 ),
-                model_name=self.model_name,
+                model_name=primary_model,
                 generation_ms=elapsed_ms,
                 input_tokens=0,
                 output_tokens=0,
@@ -220,7 +286,7 @@ class RAGGenerator:
             elapsed_ms = max(0, int((time.perf_counter_ns() - start_ns) // 1_000_000))
             return GenerationResult(
                 llm_output=output,
-                model_name=f"{self.model_name}-extractive-fallback",
+                model_name=f"{primary_model}-extractive-fallback",
                 generation_ms=elapsed_ms,
                 input_tokens=0,
                 output_tokens=0,
@@ -231,7 +297,7 @@ class RAGGenerator:
         prompt = _format_context_prompt(query, chunks)
         last_exc: Exception | None = None
         saw_429 = False
-        for idx, model_candidate in enumerate(self.model_chain):
+        for idx, model_candidate in enumerate(active_chain):
             try:
                 response = self._client.models.generate_content(
                     model=model_candidate,
@@ -260,13 +326,15 @@ class RAGGenerator:
                     generation_ms=elapsed_ms,
                     input_tokens=in_tok,
                     output_tokens=out_tok,
-                    estimated_cost_usd=estimate_llm_cost_usd(in_tok, out_tok),
+                    estimated_cost_usd=estimate_llm_cost_usd(
+                        in_tok, out_tok, model_name=model_candidate
+                    ),
                     used_fallback=False,
                 )
             except Exception as exc:
                 last_exc = exc
                 saw_429 = saw_429 or is_rate_limit_error(exc)
-                has_next = idx + 1 < len(self.model_chain)
+                has_next = idx + 1 < len(active_chain)
                 logger.warning(
                     "Gemini generate_content failed on model %s (%s: %s)%s.",
                     model_candidate,
@@ -279,9 +347,9 @@ class RAGGenerator:
 
         assert last_exc is not None
         fallback_model = (
-            f"{self.model_name}-429-fallback"
+            f"{primary_model}-429-fallback"
             if saw_429
-            else classify_fallback_model_name(self.model_name, last_exc)
+            else classify_fallback_model_name(primary_model, last_exc)
         )
         logger.warning(
             "All Gemini chat models failed; using grounded extractive fallback (%s).",
