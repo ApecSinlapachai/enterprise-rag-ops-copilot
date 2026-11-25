@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Activity,
   BarChart3,
@@ -14,31 +14,74 @@ import {
 import { EvalAndCorpusWorkspace } from "@/components/EvalAndCorpusWorkspace";
 import { RagWorkspace } from "@/components/RagWorkspace";
 import { TriageWorkspace } from "@/components/TriageWorkspace";
-import { API_BASE_URL, fetchHealth } from "@/lib/api";
+import { API_PROXY_PREFIX, fetchHealth } from "@/lib/api";
 import type { HealthResponse, LanguageMode } from "@/lib/types";
 
 type ActiveTab = "rag" | "triage" | "eval";
+
+const HEALTH_RETRY_INTERVAL_MS = 5_000;
+const HEALTH_MAX_ATTEMPTS = 10;
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("rag");
   const [uiLang, setUiLang] = useState<LanguageMode>("en");
   const [healthState, setHealthState] = useState<"warming" | "ready" | "offline">("warming");
   const [healthInfo, setHealthInfo] = useState<HealthResponse | null>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pingRunIdRef = useRef(0);
 
-  async function pingHealth() {
+  const startHealthCheck = useCallback(() => {
+    if (retryTimerRef.current !== null) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+
+    pingRunIdRef.current += 1;
+    const runId = pingRunIdRef.current;
     setHealthState("warming");
-    try {
-      const res = await fetchHealth();
-      setHealthInfo(res);
-      setHealthState(res.database_connected ? "ready" : "offline");
-    } catch {
+
+    async function attemptPing(attempt: number) {
+      let latestHealth: HealthResponse | null = null;
+      try {
+        latestHealth = await fetchHealth();
+        if (runId !== pingRunIdRef.current) return;
+
+        if (latestHealth.database_connected) {
+          setHealthInfo(latestHealth);
+          setHealthState("ready");
+          return;
+        }
+      } catch {
+        if (runId !== pingRunIdRef.current) return;
+      }
+
+      if (attempt < HEALTH_MAX_ATTEMPTS) {
+        retryTimerRef.current = setTimeout(() => {
+          retryTimerRef.current = null;
+          void attemptPing(attempt + 1);
+        }, HEALTH_RETRY_INTERVAL_MS);
+        return;
+      }
+
+      if (latestHealth !== null) {
+        setHealthInfo(latestHealth);
+      }
       setHealthState("offline");
     }
-  }
+
+    void attemptPing(1);
+  }, []);
 
   useEffect(() => {
-    void pingHealth();
-  }, []);
+    startHealthCheck();
+    return () => {
+      pingRunIdRef.current += 1;
+      if (retryTimerRef.current !== null) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+    };
+  }, [startHealthCheck]);
 
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-100">
@@ -63,8 +106,8 @@ export default function HomePage() {
             {/* Render / Backend Warm-up Health Pill */}
             <button
               type="button"
-              onClick={() => void pingHealth()}
-              title={`API: ${API_BASE_URL}`}
+              onClick={() => startHealthCheck()}
+              title={`API proxied via ${API_PROXY_PREFIX}`}
               className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${
                 healthState === "ready"
                   ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"

@@ -12,6 +12,10 @@ export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ||
   "http://localhost:8000";
 
+export const API_PROXY_PREFIX = (
+  process.env.NEXT_PUBLIC_API_PROXY_PREFIX || "/backend"
+).replace(/\/+$/, "");
+
 export class ApiError extends Error {
   status: number;
   retryAfterSeconds?: number;
@@ -25,12 +29,14 @@ export class ApiError extends Error {
 }
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const headers: HeadersInit = {
+    ...(init?.body !== undefined ? { "Content-Type": "application/json" } : {}),
+    ...(init?.headers ?? {}),
+  };
+
+  const response = await fetch(`${API_PROXY_PREFIX}${path}`, {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
+    headers,
     cache: "no-store",
   });
 
