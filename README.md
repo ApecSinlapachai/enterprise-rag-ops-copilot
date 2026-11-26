@@ -2,17 +2,18 @@
 
 > **Production-Minded Thai–English Hybrid RAG Copilot, Pydantic v2 Support Ticket Triage API, and 25-Case Golden Eval Gate** with a No-Login Next.js Live Demo (`$0` Free-Tier Stack).
 
-[![Live Demo](https://img.shields.io/static/v1?label=Live%20Demo&message=Vercel&color=000000&style=flat-square&logo=vercel)](https://enterprise-rag-ops-copilot.vercel.app/)
+[![Live Demo](https://img.shields.io/static/v1?label=Live%20Demo&message=Vercel&color=000000&style=flat-square&logo=vercel)](https://apec-ai-portfolio.vercel.app/demos/rag-copilot)
 [![API Health](https://img.shields.io/static/v1?label=API%20Health&message=Render&color=46E3B7&style=flat-square&logo=render&logoColor=000)](https://enterprise-rag-ops-copilot-api.onrender.com/health)
 [![Pytest](https://img.shields.io/static/v1?label=Pytest&message=47%2F47%20Passing&color=2EA44F&style=flat-square&logo=pytest&logoColor=white)](#golden-evaluation-gate-ci--live-production-verified)
 [![Golden Eval](https://img.shields.io/static/v1?label=Golden%20Eval&message=25%2F25%20Live%20%26%20CI&color=0969DA&style=flat-square)](#golden-evaluation-gate-ci--live-production-verified)
 [![Stack](https://img.shields.io/static/v1?label=Cost&message=%240%20Free-Tier%20Stack&color=6E40C9&style=flat-square)](#free-tier-deployment-guide-0-stack)
 
-🔗 **Live Demo:** [https://enterprise-rag-ops-copilot.vercel.app/](https://enterprise-rag-ops-copilot.vercel.app/)  
+🔗 **Live Demo:** [https://apec-ai-portfolio.vercel.app/demos/rag-copilot](https://apec-ai-portfolio.vercel.app/demos/rag-copilot)  
+💬 **Ask AI about this project:** [Chat with Portfolio Copilot](https://apec-ai-portfolio.vercel.app/chat?scope=enterprise-rag-ops-copilot)  
 🩺 **Live API Health:** [https://enterprise-rag-ops-copilot-api.onrender.com/health](https://enterprise-rag-ops-copilot-api.onrender.com/health)
 
 <p align="center">
-  <a href="https://enterprise-rag-ops-copilot.vercel.app/">
+  <a href="https://apec-ai-portfolio.vercel.app/demos/rag-copilot">
     <img src="docs/assets/demo-60s.gif" alt="Enterprise RAG Ops Copilot Live Demo Walkthrough" width="100%" />
   </a>
   <br />
