@@ -163,5 +163,19 @@ npm run dev
      ```
 3. **Frontend (Vercel Hobby):**
    - Import the repository in Vercel with Root Directory set to `web`.
-   - Set `NEXT_PUBLIC_API_BASE_URL=https://<your-render-api>.onrender.com`.
-   - Deploy; the frontend automatically pings `GET /health` on load to wake up the Render Free instance.
+   - Set `API_PROXY_TARGET=https://<your-render-api>.onrender.com` (proxied via `/backend/*` in `web/next.config.mjs`).
+   - Deploy; the frontend automatically polls `GET /backend/health` on load to wake up the Render Free instance.
+
+---
+
+## 📐 Engineering Standards & Architecture Docs (SSOT)
+
+This repository follows a **6-Layer AI-Native SSOT** engineering layout:
+
+- **Product & Technical Spec:** [`docs/SPEC.md`](docs/SPEC.md)
+- **Architecture Decision Records (ADRs):**
+  - [`0001-hybrid-rrf-pgvector-pythainlp-pgtrgm.md`](docs/adr/0001-hybrid-rrf-pgvector-pythainlp-pgtrgm.md)
+  - [`0002-three-stage-guardrails-and-tiered-gemini-routing.md`](docs/adr/0002-three-stage-guardrails-and-tiered-gemini-routing.md)
+  - [`0003-same-origin-nextjs-proxy-and-cold-start-resilience.md`](docs/adr/0003-same-origin-nextjs-proxy-and-cold-start-resilience.md)
+- **Live Progress & Handoff Ledger:** [`docs/PROGRESS.md`](docs/PROGRESS.md)
+- **AI Agent Entrypoint & Guardrails:** [`AGENTS.md`](AGENTS.md) *(and [`CLAUDE.md`](CLAUDE.md))*
