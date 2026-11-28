@@ -35,6 +35,9 @@ class HealthResponse(BaseModel):
     status: str
     version: str
     database_connected: bool
+    chat_model: str | None = None
+    complex_model: str | None = None
+    embed_model: str | None = None
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -95,6 +98,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             status="ok" if db_ok else "degraded",
             version=cfg.app_version,
             database_connected=db_ok,
+            chat_model=cfg.gemini_chat_model,
+            complex_model=cfg.gemini_complex_model,
+            embed_model=cfg.gemini_embed_model,
         )
 
     app.include_router(rag_router)

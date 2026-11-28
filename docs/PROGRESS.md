@@ -1,7 +1,7 @@
 # PROGRESS — enterprise-rag-ops-copilot
 
-- **Last Updated:** 2026-11-26
-- **Current Phase:** Shipped & Live in Production (6-Layer AI-Native SSOT Standardized)
+- **Last Updated:** 2026-11-28
+- **Current Phase:** Shipped & Live in Production (6-Layer AI-Native SSOT Standardized + Extended `/health` Model Telemetry)
 
 > **Handoff Rule:** Keep this file crisp and factual. Update it immediately after every completed task (alongside `git commit`) so any new model or chat session can resume in < 10 seconds.
 
@@ -14,6 +14,7 @@
 - [x] **25-Case Golden Eval Gate & GitHub Actions CI:** `eval/golden_eval_set.json`, `eval/run_eval.py` (`25/25` in both `ci_mock` and live Supabase `production-baseline`), and `.github/workflows/ci.yml` (`ruff`, `pytest`, PG16 DDL, Eval Gate, Docker, Next.js build).
 - [x] **No-Login Next.js Demo, Same-Origin Proxy & Cloud Rollout:** Deployed to Supabase Free + Render Free + Vercel Hobby; migrated browser calls to same-origin `/backend/*` proxy (`web/next.config.mjs`) with 10×5s cold-start `/health` polling (`web/src/app/page.tsx`) and SHA-256 IP-hashed rate limiting (`api/app/services/rate_limiter.py`).
 - [x] **6-Layer AI-Native SSOT Standardization:** Refactored `AGENTS.md` to concise entrypoint, added `CLAUDE.md`, `.editorconfig`, `docs/SPEC.md`, `docs/PROGRESS.md`, and `docs/adr/0001..0003`.
+- [x] **Backward-Compatible `/health` Model Metadata:** Extended `HealthResponse` and synchronous `GET /health` (`api/app/main.py`) with optional `chat_model`, `complex_model`, and `embed_model` fields populated from `Settings`, with unit tests in `tests/unit/test_config_and_health.py` (`ruff check` 0 errors, `pytest -v` 44 passed).
 
 ## In Progress / Next Up
 1. Maintain `eval/golden_eval_set.json` and `docs/adr/` as new retrieval or model routing enhancements are introduced.
